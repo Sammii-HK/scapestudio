@@ -4,11 +4,45 @@ import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import { useEditorStore } from "@/lib/store/editor-store";
 import { CropOverlay } from "@/components/editor/CropOverlay";
 
+const CHECKERBOARD_SIZE = 12;
+
+function drawCheckerboard(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+
+  const light = "#1e1e1e";
+  const dark = "#121212";
+
+  for (let row = Math.floor(y / CHECKERBOARD_SIZE); row * CHECKERBOARD_SIZE < y + h; row++) {
+    for (let col = Math.floor(x / CHECKERBOARD_SIZE); col * CHECKERBOARD_SIZE < x + w; col++) {
+      ctx.fillStyle = (row + col) % 2 === 0 ? light : dark;
+      ctx.fillRect(
+        col * CHECKERBOARD_SIZE,
+        row * CHECKERBOARD_SIZE,
+        CHECKERBOARD_SIZE,
+        CHECKERBOARD_SIZE
+      );
+    }
+  }
+  ctx.restore();
+}
+
 export function EditorCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sourceImage = useEditorStore((s) => s.sourceImage);
   const processedImage = useEditorStore((s) => s.processedImage);
+  const tshirtImage = useEditorStore((s) => s.tshirtImage);
+  const previewMode = useEditorStore((s) => s.previewMode);
+  const tshirtBackground = useEditorStore((s) => s.tshirtBackground);
   const zoom = useEditorStore((s) => s.zoom);
   const panX = useEditorStore((s) => s.panX);
   const panY = useEditorStore((s) => s.panY);
@@ -37,31 +71,41 @@ export function EditorCanvas() {
     return () => observer.disconnect();
   }, []);
 
-  // Compute imageRect from state (no side effects)
+  // Compute imageRect based on preview mode
   const imageRect = useMemo(() => {
     if (!sourceImage || containerSize.width === 0) {
       return { x: 0, y: 0, width: 0, height: 0 };
     }
 
+    const availableWidth =
+      previewMode === "split"
+        ? (containerSize.width - 16) / 2 // half width minus gap
+        : containerSize.width;
+
     const fitScale = Math.min(
-      (containerSize.width - 40) / sourceImage.width,
+      (availableWidth - 40) / sourceImage.width,
       (containerSize.height - 40) / sourceImage.height
     );
 
     const displayWidth = sourceImage.width * fitScale * zoom;
     const displayHeight = sourceImage.height * fitScale * zoom;
+
+    if (previewMode === "split") {
+      const halfW = containerSize.width / 2;
+      const x = (halfW - displayWidth) / 2 + panX;
+      const y = (containerSize.height - displayHeight) / 2 + panY;
+      return { x, y, width: displayWidth, height: displayHeight };
+    }
+
     const x = (containerSize.width - displayWidth) / 2 + panX;
     const y = (containerSize.height - displayHeight) / 2 + panY;
-
     return { x, y, width: displayWidth, height: displayHeight };
-  }, [sourceImage, containerSize, zoom, panX, panY]);
+  }, [sourceImage, containerSize, zoom, panX, panY, previewMode]);
 
-  // Draw the image on the canvas (processed if available, otherwise source)
-  const displayImage = processedImage ?? sourceImage;
-
+  // Draw
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !displayImage || containerSize.width === 0) return;
+    if (!canvas || !sourceImage || containerSize.width === 0) return;
 
     const dpr = window.devicePixelRatio || 1;
     canvas.width = containerSize.width * dpr;
@@ -74,8 +118,71 @@ export function EditorCanvas() {
     ctx.clearRect(0, 0, containerSize.width, containerSize.height);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(displayImage, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
-  }, [displayImage, containerSize, imageRect]);
+
+    const printImg = processedImage ?? sourceImage;
+    const tshirtImg = tshirtImage;
+    const ir = imageRect;
+
+    if (previewMode === "split") {
+      const halfW = containerSize.width / 2;
+
+      // Left: Print
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, halfW - 1, containerSize.height);
+      ctx.clip();
+      ctx.drawImage(printImg, ir.x, ir.y, ir.width, ir.height);
+      ctx.restore();
+
+      // Divider
+      ctx.fillStyle = "#2a2a2a";
+      ctx.fillRect(halfW - 1, 0, 2, containerSize.height);
+
+      // Right: T-shirt
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(halfW + 1, 0, halfW - 1, containerSize.height);
+      ctx.clip();
+
+      const tshirtX = halfW + ir.x;
+
+      // Background for tshirt
+      if (tshirtBackground === "checkerboard") {
+        drawCheckerboard(ctx, tshirtX, ir.y, ir.width, ir.height);
+      } else {
+        ctx.fillStyle = tshirtBackground;
+        ctx.fillRect(tshirtX, ir.y, ir.width, ir.height);
+      }
+
+      if (tshirtImg) {
+        ctx.drawImage(tshirtImg, tshirtX, ir.y, ir.width, ir.height);
+      }
+      ctx.restore();
+
+      // Labels
+      ctx.fillStyle = "rgba(255,255,255,0.4)";
+      ctx.font = "10px var(--font-geist-mono), monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("PRINT", halfW / 2, 20);
+      ctx.fillText("T-SHIRT", halfW + halfW / 2, 20);
+
+    } else if (previewMode === "print") {
+      ctx.drawImage(printImg, ir.x, ir.y, ir.width, ir.height);
+
+    } else if (previewMode === "tshirt") {
+      // Background
+      if (tshirtBackground === "checkerboard") {
+        drawCheckerboard(ctx, ir.x, ir.y, ir.width, ir.height);
+      } else {
+        ctx.fillStyle = tshirtBackground;
+        ctx.fillRect(ir.x, ir.y, ir.width, ir.height);
+      }
+
+      if (tshirtImg) {
+        ctx.drawImage(tshirtImg, ir.x, ir.y, ir.width, ir.height);
+      }
+    }
+  }, [sourceImage, processedImage, tshirtImage, containerSize, imageRect, previewMode, tshirtBackground]);
 
   // Mouse wheel zoom
   const handleWheel = useCallback(
@@ -132,8 +239,8 @@ export function EditorCanvas() {
         className={`h-full w-full ${isPanning ? "cursor-grabbing" : "cursor-default"}`}
       />
 
-      {/* Crop overlay */}
-      {sourceImage && imageRect.width > 0 && (
+      {/* Crop overlay — only show in print or split mode */}
+      {sourceImage && imageRect.width > 0 && previewMode !== "tshirt" && (
         <CropOverlay imageRect={imageRect} />
       )}
 

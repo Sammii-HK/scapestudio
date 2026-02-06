@@ -24,6 +24,7 @@ interface EditorStore {
   threshold: number;
   feather: number;
   previewMode: PreviewMode;
+  tshirtBackground: string;
   exportSizes: ExportSize[];
 
   // Processed output
@@ -47,6 +48,7 @@ interface EditorStore {
   setThreshold: (threshold: number) => void;
   setFeather: (feather: number) => void;
   setPreviewMode: (mode: PreviewMode) => void;
+  setTshirtBackground: (bg: string) => void;
   setExportSizes: (sizes: ExportSize[]) => void;
   setProcessedImages: (print: ImageBitmap, tshirt: ImageBitmap, histogram: Uint32Array) => void;
   setIsProcessing: (processing: boolean) => void;
@@ -67,6 +69,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
   threshold: 25,
   feather: 5,
   previewMode: "split",
+  tshirtBackground: "checkerboard",
   exportSizes: DEFAULT_EXPORT_SIZES,
   processedImage: null,
   tshirtImage: null,
@@ -143,6 +146,8 @@ export const useEditorStore = create<EditorStore>((set) => ({
   setFeather: (feather) => set({ feather }),
 
   setPreviewMode: (previewMode) => set({ previewMode }),
+
+  setTshirtBackground: (tshirtBackground) => set({ tshirtBackground }),
 
   setExportSizes: (exportSizes) => set({ exportSizes }),
 
