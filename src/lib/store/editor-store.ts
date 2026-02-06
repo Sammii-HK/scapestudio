@@ -22,11 +22,13 @@ interface EditorStore {
   showGrid: boolean;
   curves: CurvePoints;
   threshold: number;
+  feather: number;
   previewMode: PreviewMode;
   exportSizes: ExportSize[];
 
   // Processed output
   processedImage: ImageBitmap | null;
+  tshirtImage: ImageBitmap | null;
   histogram: Uint32Array | null;
   isProcessing: boolean;
 
@@ -43,9 +45,10 @@ interface EditorStore {
   setShowGrid: (show: boolean) => void;
   setCurves: (curves: CurvePoints) => void;
   setThreshold: (threshold: number) => void;
+  setFeather: (feather: number) => void;
   setPreviewMode: (mode: PreviewMode) => void;
   setExportSizes: (sizes: ExportSize[]) => void;
-  setProcessedImage: (image: ImageBitmap, histogram: Uint32Array) => void;
+  setProcessedImages: (print: ImageBitmap, tshirt: ImageBitmap, histogram: Uint32Array) => void;
   setIsProcessing: (processing: boolean) => void;
   setZoom: (zoom: number) => void;
   setPan: (x: number, y: number) => void;
@@ -62,9 +65,11 @@ export const useEditorStore = create<EditorStore>((set) => ({
   showGrid: true,
   curves: DEFAULT_CURVES,
   threshold: 25,
+  feather: 5,
   previewMode: "split",
   exportSizes: DEFAULT_EXPORT_SIZES,
   processedImage: null,
+  tshirtImage: null,
   histogram: null,
   isProcessing: false,
   zoom: 1,
@@ -90,6 +95,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       curves: DEFAULT_CURVES,
       threshold: 25,
       processedImage: null,
+      tshirtImage: null,
       histogram: null,
       isProcessing: false,
       zoom: 1,
@@ -134,12 +140,14 @@ export const useEditorStore = create<EditorStore>((set) => ({
 
   setThreshold: (threshold) => set({ threshold }),
 
+  setFeather: (feather) => set({ feather }),
+
   setPreviewMode: (previewMode) => set({ previewMode }),
 
   setExportSizes: (exportSizes) => set({ exportSizes }),
 
-  setProcessedImage: (processedImage, histogram) =>
-    set({ processedImage, histogram, isProcessing: false }),
+  setProcessedImages: (processedImage, tshirtImage, histogram) =>
+    set({ processedImage, tshirtImage, histogram, isProcessing: false }),
 
   setIsProcessing: (isProcessing) => set({ isProcessing }),
 

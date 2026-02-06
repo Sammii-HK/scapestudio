@@ -5,16 +5,17 @@ import { useEditorStore } from "@/lib/store/editor-store";
 import { processImage, destroyWorker } from "@/lib/image-processing/pipeline";
 
 /**
- * Hook that triggers image processing whenever the source image or curves change.
- * Uses a Web Worker with debouncing for real-time preview.
+ * Hook that triggers image processing whenever source image, curves,
+ * threshold, or feather change. Uses a Web Worker with debouncing.
  */
 export function useImageProcessing() {
   const sourceImage = useEditorStore((s) => s.sourceImage);
   const curves = useEditorStore((s) => s.curves);
-  const setProcessedImage = useEditorStore((s) => s.setProcessedImage);
+  const threshold = useEditorStore((s) => s.threshold);
+  const feather = useEditorStore((s) => s.feather);
+  const setProcessedImages = useEditorStore((s) => s.setProcessedImages);
   const setIsProcessing = useEditorStore((s) => s.setIsProcessing);
 
-  // Track if component is mounted to avoid setState after unmount
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -30,10 +31,10 @@ export function useImageProcessing() {
 
     setIsProcessing(true);
 
-    processImage(sourceImage, curves, (result) => {
+    processImage(sourceImage, curves, threshold, feather, (result) => {
       if (mountedRef.current) {
-        setProcessedImage(result.printBitmap, result.histogram);
+        setProcessedImages(result.printBitmap, result.tshirtBitmap, result.histogram);
       }
     });
-  }, [sourceImage, curves, setProcessedImage, setIsProcessing]);
+  }, [sourceImage, curves, threshold, feather, setProcessedImages, setIsProcessing]);
 }

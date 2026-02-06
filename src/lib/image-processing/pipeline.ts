@@ -7,11 +7,13 @@ const DEBOUNCE_MS = 100;
 interface ProcessResult {
   type: "result";
   printBitmap: ImageBitmap;
+  tshirtBitmap: ImageBitmap;
   histogram: Uint32Array;
 }
 
 type ProcessCallback = (result: {
   printBitmap: ImageBitmap;
+  tshirtBitmap: ImageBitmap;
   histogram: Uint32Array;
 }) => void;
 
@@ -28,6 +30,7 @@ function getWorker(): Worker {
       if (e.data.type === "result" && currentCallback) {
         currentCallback({
           printBitmap: e.data.printBitmap,
+          tshirtBitmap: e.data.tshirtBitmap,
           histogram: e.data.histogram,
         });
       }
@@ -37,12 +40,14 @@ function getWorker(): Worker {
 }
 
 /**
- * Process an image through the grayscale + curves pipeline.
+ * Process an image through the grayscale + curves + threshold pipeline.
  * Debounced — rapid calls will only execute the last one.
  */
 export function processImage(
   sourceImage: ImageBitmap,
   curves: CurvePoints,
+  threshold: number,
+  feather: number,
   onResult: ProcessCallback
 ): void {
   if (debounceTimer) clearTimeout(debounceTimer);
@@ -52,15 +57,14 @@ export function processImage(
     const lut = generateCurveLUT(curves);
     const w = getWorker();
 
-    w.postMessage(
-      {
-        type: "process",
-        imageBitmap: sourceImage,
-        curveLUT: lut,
-        previewMaxSize: PREVIEW_MAX_SIZE,
-      },
-      // Note: we do NOT transfer sourceImage — we need it for re-processing
-    );
+    w.postMessage({
+      type: "process",
+      imageBitmap: sourceImage,
+      curveLUT: lut,
+      threshold,
+      feather,
+      previewMaxSize: PREVIEW_MAX_SIZE,
+    });
   }, DEBOUNCE_MS);
 }
 

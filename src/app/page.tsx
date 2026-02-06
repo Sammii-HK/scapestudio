@@ -8,6 +8,7 @@ import { Toolbar } from "@/components/editor/Toolbar";
 import { CropControls } from "@/components/editor/CropControls";
 import { CurvesEditor } from "@/components/controls/CurvesEditor";
 import { PresetManager } from "@/components/controls/PresetManager";
+import { ThresholdSlider } from "@/components/controls/ThresholdSlider";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ export default function Home() {
   const curves = useEditorStore((s) => s.curves);
   const setCurves = useEditorStore((s) => s.setCurves);
 
-  // Trigger processing whenever source/curves change
+  // Trigger processing whenever source/curves/threshold change
   useImageProcessing();
 
   const isDefaultCurves =
@@ -72,14 +73,12 @@ export default function Home() {
 
             <Separator />
 
-            {/* Threshold placeholder for Phase 5 */}
-            <div className="p-4">
+            {/* Threshold section */}
+            <div className="flex flex-col gap-3 p-4">
               <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 Threshold
               </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Coming in Phase 5.
-              </p>
+              <ThresholdSlider />
             </div>
           </aside>
         )}

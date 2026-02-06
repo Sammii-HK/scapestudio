@@ -2,24 +2,27 @@
 
 /**
  * Web Worker for image processing.
- * Note: We inline the processing functions here because workers
- * can't use @ path aliases with Next.js bundling.
+ * Produces both print (grayscale + curves) and tshirt (+ threshold knockout) bitmaps.
  */
 
 export interface ProcessMessage {
   type: "process";
   imageBitmap: ImageBitmap;
   curveLUT: Uint8Array;
+  threshold: number;
+  feather: number;
   previewMaxSize: number;
 }
 
 export interface ProcessResult {
   type: "result";
   printBitmap: ImageBitmap;
+  tshirtBitmap: ImageBitmap;
   histogram: Uint32Array;
 }
 
-// Inline grayscale processing
+// Inline processing functions (workers can't use @ path aliases)
+
 function applyGrayscale(data: Uint8ClampedArray): void {
   for (let i = 0; i < data.length; i += 4) {
     const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
@@ -40,7 +43,6 @@ function computeHistogram(data: Uint8ClampedArray): Uint32Array {
   return histogram;
 }
 
-// Inline curves LUT application
 function applyCurveLUT(data: Uint8ClampedArray, lut: Uint8Array): void {
   for (let i = 0; i < data.length; i += 4) {
     const v = lut[data[i]];
@@ -50,12 +52,31 @@ function applyCurveLUT(data: Uint8ClampedArray, lut: Uint8Array): void {
   }
 }
 
+function applyThreshold(
+  data: Uint8ClampedArray,
+  threshold: number,
+  feather: number
+): void {
+  const lower = Math.max(0, threshold - feather);
+
+  for (let i = 0; i < data.length; i += 4) {
+    const lum = data[i];
+
+    if (lum <= lower) {
+      data[i + 3] = 0;
+    } else if (lum <= threshold && feather > 0) {
+      const alpha = ((lum - lower) / feather) * 255;
+      data[i + 3] = Math.round(alpha);
+    }
+  }
+}
+
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
 ctx.addEventListener("message", (e: MessageEvent<ProcessMessage>) => {
   if (e.data.type !== "process") return;
 
-  const { imageBitmap, curveLUT, previewMaxSize } = e.data;
+  const { imageBitmap, curveLUT, threshold, feather, previewMaxSize } = e.data;
 
   // Determine preview dimensions
   const scale = Math.min(
@@ -76,23 +97,34 @@ ctx.addEventListener("message", (e: MessageEvent<ProcessMessage>) => {
   // Compute histogram from original color data
   const histogram = computeHistogram(imageData.data);
 
-  // Apply grayscale
+  // Apply grayscale + curves
   applyGrayscale(imageData.data);
-
-  // Apply curves LUT
   applyCurveLUT(imageData.data, curveLUT);
 
-  // Write back
+  // Write back for print version
   canvasCtx.putImageData(imageData, 0, 0);
-
-  // Transfer as ImageBitmap
   const printBitmap = canvas.transferToImageBitmap();
+
+  // Create tshirt version: copy the processed data and apply threshold
+  const tshirtCanvas = new OffscreenCanvas(width, height);
+  const tshirtCtx = tshirtCanvas.getContext("2d")!;
+
+  // imageData still has the grayscale+curves pixel data, clone it
+  const tshirtData = new ImageData(
+    new Uint8ClampedArray(imageData.data),
+    width,
+    height
+  );
+  applyThreshold(tshirtData.data, threshold, feather);
+  tshirtCtx.putImageData(tshirtData, 0, 0);
+  const tshirtBitmap = tshirtCanvas.transferToImageBitmap();
 
   const result: ProcessResult = {
     type: "result",
     printBitmap,
+    tshirtBitmap,
     histogram,
   };
 
-  ctx.postMessage(result, [printBitmap, histogram.buffer]);
+  ctx.postMessage(result, [printBitmap, tshirtBitmap, histogram.buffer]);
 });
