@@ -35,12 +35,57 @@ function drawCheckerboard(
   ctx.restore();
 }
 
+/**
+ * Draw the tshirt preview showing only the cropped region, fit to the available area.
+ */
+function drawTshirtCropped(
+  ctx: CanvasRenderingContext2D,
+  tshirtImg: ImageBitmap,
+  crop: { x: number; y: number; width: number; height: number },
+  areaX: number,
+  areaY: number,
+  areaW: number,
+  areaH: number,
+  background: string,
+  zoom: number,
+  panX: number,
+  panY: number
+) {
+  // Source region in the tshirt bitmap (crop is normalized 0-1)
+  const sx = crop.x * tshirtImg.width;
+  const sy = crop.y * tshirtImg.height;
+  const sw = crop.width * tshirtImg.width;
+  const sh = crop.height * tshirtImg.height;
+
+  // Fit cropped region into available area
+  const fitScale = Math.min(
+    (areaW - 40) / sw,
+    (areaH - 40) / sh
+  );
+  const displayW = sw * fitScale * zoom;
+  const displayH = sh * fitScale * zoom;
+  const dx = areaX + (areaW - displayW) / 2 + panX;
+  const dy = areaY + (areaH - displayH) / 2 + panY;
+
+  // Background
+  if (background === "checkerboard") {
+    drawCheckerboard(ctx, dx, dy, displayW, displayH);
+  } else {
+    ctx.fillStyle = background;
+    ctx.fillRect(dx, dy, displayW, displayH);
+  }
+
+  // Draw cropped region
+  ctx.drawImage(tshirtImg, sx, sy, sw, sh, dx, dy, displayW, displayH);
+}
+
 export function EditorCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sourceImage = useEditorStore((s) => s.sourceImage);
   const processedImage = useEditorStore((s) => s.processedImage);
   const tshirtImage = useEditorStore((s) => s.tshirtImage);
+  const crop = useEditorStore((s) => s.crop);
   const previewMode = useEditorStore((s) => s.previewMode);
   const tshirtBackground = useEditorStore((s) => s.tshirtBackground);
   const zoom = useEditorStore((s) => s.zoom);
@@ -71,7 +116,7 @@ export function EditorCanvas() {
     return () => observer.disconnect();
   }, []);
 
-  // Compute imageRect based on preview mode
+  // Compute imageRect for the print/source image display
   const imageRect = useMemo(() => {
     if (!sourceImage || containerSize.width === 0) {
       return { x: 0, y: 0, width: 0, height: 0 };
@@ -79,7 +124,7 @@ export function EditorCanvas() {
 
     const availableWidth =
       previewMode === "split"
-        ? (containerSize.width - 16) / 2 // half width minus gap
+        ? (containerSize.width - 16) / 2
         : containerSize.width;
 
     const fitScale = Math.min(
@@ -126,7 +171,7 @@ export function EditorCanvas() {
     if (previewMode === "split") {
       const halfW = containerSize.width / 2;
 
-      // Left: Print
+      // Left: Print (full image with crop overlay handled by DOM)
       ctx.save();
       ctx.beginPath();
       ctx.rect(0, 0, halfW - 1, containerSize.height);
@@ -138,24 +183,26 @@ export function EditorCanvas() {
       ctx.fillStyle = "#2a2a2a";
       ctx.fillRect(halfW - 1, 0, 2, containerSize.height);
 
-      // Right: T-shirt
+      // Right: T-shirt (cropped final)
       ctx.save();
       ctx.beginPath();
       ctx.rect(halfW + 1, 0, halfW - 1, containerSize.height);
       ctx.clip();
 
-      const tshirtX = halfW + ir.x;
-
-      // Background for tshirt
-      if (tshirtBackground === "checkerboard") {
-        drawCheckerboard(ctx, tshirtX, ir.y, ir.width, ir.height);
-      } else {
-        ctx.fillStyle = tshirtBackground;
-        ctx.fillRect(tshirtX, ir.y, ir.width, ir.height);
-      }
-
       if (tshirtImg) {
-        ctx.drawImage(tshirtImg, tshirtX, ir.y, ir.width, ir.height);
+        drawTshirtCropped(
+          ctx,
+          tshirtImg,
+          crop,
+          halfW + 1,
+          0,
+          halfW - 1,
+          containerSize.height,
+          tshirtBackground,
+          zoom,
+          panX,
+          panY
+        );
       }
       ctx.restore();
 
@@ -170,19 +217,23 @@ export function EditorCanvas() {
       ctx.drawImage(printImg, ir.x, ir.y, ir.width, ir.height);
 
     } else if (previewMode === "tshirt") {
-      // Background
-      if (tshirtBackground === "checkerboard") {
-        drawCheckerboard(ctx, ir.x, ir.y, ir.width, ir.height);
-      } else {
-        ctx.fillStyle = tshirtBackground;
-        ctx.fillRect(ir.x, ir.y, ir.width, ir.height);
-      }
-
       if (tshirtImg) {
-        ctx.drawImage(tshirtImg, ir.x, ir.y, ir.width, ir.height);
+        drawTshirtCropped(
+          ctx,
+          tshirtImg,
+          crop,
+          0,
+          0,
+          containerSize.width,
+          containerSize.height,
+          tshirtBackground,
+          zoom,
+          panX,
+          panY
+        );
       }
     }
-  }, [sourceImage, processedImage, tshirtImage, containerSize, imageRect, previewMode, tshirtBackground]);
+  }, [sourceImage, processedImage, tshirtImage, crop, containerSize, imageRect, previewMode, tshirtBackground, zoom, panX, panY]);
 
   // Mouse wheel zoom
   const handleWheel = useCallback(
@@ -239,7 +290,7 @@ export function EditorCanvas() {
         className={`h-full w-full ${isPanning ? "cursor-grabbing" : "cursor-default"}`}
       />
 
-      {/* Crop overlay — only show in print or split mode */}
+      {/* Crop overlay — only show in print or split (left side only) */}
       {sourceImage && imageRect.width > 0 && previewMode !== "tshirt" && (
         <CropOverlay imageRect={imageRect} />
       )}
