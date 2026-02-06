@@ -73,7 +73,7 @@ function applyThreshold(
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
-ctx.addEventListener("message", (e: MessageEvent<ProcessMessage>) => {
+ctx.addEventListener("message", async (e: MessageEvent<ProcessMessage>) => {
   if (e.data.type !== "process") return;
 
   const { imageBitmap, curveLUT, threshold, feather, previewMaxSize } = e.data;
@@ -101,23 +101,17 @@ ctx.addEventListener("message", (e: MessageEvent<ProcessMessage>) => {
   applyGrayscale(imageData.data);
   applyCurveLUT(imageData.data, curveLUT);
 
-  // Write back for print version
-  canvasCtx.putImageData(imageData, 0, 0);
-  const printBitmap = canvas.transferToImageBitmap();
+  // Print version: create bitmap directly from ImageData (avoids canvas premultiply)
+  const printBitmap = await createImageBitmap(imageData);
 
-  // Create tshirt version: copy the processed data and apply threshold
-  const tshirtCanvas = new OffscreenCanvas(width, height);
-  const tshirtCtx = tshirtCanvas.getContext("2d")!;
-
-  // imageData still has the grayscale+curves pixel data, clone it
+  // Tshirt version: clone processed data, apply threshold, create bitmap directly
   const tshirtData = new ImageData(
     new Uint8ClampedArray(imageData.data),
     width,
     height
   );
   applyThreshold(tshirtData.data, threshold, feather);
-  tshirtCtx.putImageData(tshirtData, 0, 0);
-  const tshirtBitmap = tshirtCanvas.transferToImageBitmap();
+  const tshirtBitmap = await createImageBitmap(tshirtData);
 
   const result: ProcessResult = {
     type: "result",
