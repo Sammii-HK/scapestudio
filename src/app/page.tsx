@@ -7,6 +7,7 @@ import { EditorCanvas } from "@/components/editor/EditorCanvas";
 import { Toolbar } from "@/components/editor/Toolbar";
 import { CropControls } from "@/components/editor/CropControls";
 import { CurvesEditor } from "@/components/controls/CurvesEditor";
+import { PresetManager } from "@/components/controls/PresetManager";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ export default function Home() {
                   </Button>
                 )}
               </div>
+              <PresetManager />
               <CurvesEditor histogram={histogram} />
               <div className="flex items-center justify-between">
                 <Label className="text-xs text-muted-foreground">
