@@ -25,6 +25,11 @@ interface EditorStore {
   previewMode: PreviewMode;
   exportSizes: ExportSize[];
 
+  // Processed output
+  processedImage: ImageBitmap | null;
+  histogram: Uint32Array | null;
+  isProcessing: boolean;
+
   // Viewport
   zoom: number;
   panX: number;
@@ -40,6 +45,8 @@ interface EditorStore {
   setThreshold: (threshold: number) => void;
   setPreviewMode: (mode: PreviewMode) => void;
   setExportSizes: (sizes: ExportSize[]) => void;
+  setProcessedImage: (image: ImageBitmap, histogram: Uint32Array) => void;
+  setIsProcessing: (processing: boolean) => void;
   setZoom: (zoom: number) => void;
   setPan: (x: number, y: number) => void;
   resetViewport: () => void;
@@ -57,6 +64,9 @@ export const useEditorStore = create<EditorStore>((set) => ({
   threshold: 25,
   previewMode: "split",
   exportSizes: DEFAULT_EXPORT_SIZES,
+  processedImage: null,
+  histogram: null,
+  isProcessing: false,
   zoom: 1,
   panX: 0,
   panY: 0,
@@ -79,6 +89,9 @@ export const useEditorStore = create<EditorStore>((set) => ({
       crop: DEFAULT_CROP,
       curves: DEFAULT_CURVES,
       threshold: 25,
+      processedImage: null,
+      histogram: null,
+      isProcessing: false,
       zoom: 1,
       panX: 0,
       panY: 0,
@@ -124,6 +137,11 @@ export const useEditorStore = create<EditorStore>((set) => ({
   setPreviewMode: (previewMode) => set({ previewMode }),
 
   setExportSizes: (exportSizes) => set({ exportSizes }),
+
+  setProcessedImage: (processedImage, histogram) =>
+    set({ processedImage, histogram, isProcessing: false }),
+
+  setIsProcessing: (isProcessing) => set({ isProcessing }),
 
   setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(10, zoom)) }),
 

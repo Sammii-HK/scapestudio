@@ -8,6 +8,7 @@ export function EditorCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const sourceImage = useEditorStore((s) => s.sourceImage);
+  const processedImage = useEditorStore((s) => s.processedImage);
   const zoom = useEditorStore((s) => s.zoom);
   const panX = useEditorStore((s) => s.panX);
   const panY = useEditorStore((s) => s.panY);
@@ -55,10 +56,12 @@ export function EditorCanvas() {
     return { x, y, width: displayWidth, height: displayHeight };
   }, [sourceImage, containerSize, zoom, panX, panY]);
 
-  // Draw the image on the canvas
+  // Draw the image on the canvas (processed if available, otherwise source)
+  const displayImage = processedImage ?? sourceImage;
+
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !sourceImage || containerSize.width === 0) return;
+    if (!canvas || !displayImage || containerSize.width === 0) return;
 
     const dpr = window.devicePixelRatio || 1;
     canvas.width = containerSize.width * dpr;
@@ -71,8 +74,8 @@ export function EditorCanvas() {
     ctx.clearRect(0, 0, containerSize.width, containerSize.height);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(sourceImage, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
-  }, [sourceImage, containerSize, imageRect]);
+    ctx.drawImage(displayImage, imageRect.x, imageRect.y, imageRect.width, imageRect.height);
+  }, [displayImage, containerSize, imageRect]);
 
   // Mouse wheel zoom
   const handleWheel = useCallback(
