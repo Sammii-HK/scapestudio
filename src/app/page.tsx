@@ -9,6 +9,7 @@ import { CropControls } from "@/components/editor/CropControls";
 import { CurvesEditor } from "@/components/controls/CurvesEditor";
 import { PresetManager } from "@/components/controls/PresetManager";
 import { ThresholdSlider } from "@/components/controls/ThresholdSlider";
+import { ExportPanel } from "@/components/editor/ExportPanel";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,11 @@ export default function Home() {
               </p>
               <ThresholdSlider />
             </div>
+
+            <Separator />
+
+            {/* Export section */}
+            <ExportPanel />
           </aside>
         )}
       </main>

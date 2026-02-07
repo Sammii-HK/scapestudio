@@ -33,6 +33,10 @@ interface EditorStore {
   histogram: Uint32Array | null;
   isProcessing: boolean;
 
+  // Export
+  isExporting: boolean;
+  exportProgress: number;
+
   // Viewport
   zoom: number;
   panX: number;
@@ -52,6 +56,8 @@ interface EditorStore {
   setExportSizes: (sizes: ExportSize[]) => void;
   setProcessedImages: (print: ImageBitmap, tshirt: ImageBitmap, histogram: Uint32Array) => void;
   setIsProcessing: (processing: boolean) => void;
+  setIsExporting: (exporting: boolean) => void;
+  setExportProgress: (progress: number) => void;
   setZoom: (zoom: number) => void;
   setPan: (x: number, y: number) => void;
   resetViewport: () => void;
@@ -75,6 +81,8 @@ export const useEditorStore = create<EditorStore>((set) => ({
   tshirtImage: null,
   histogram: null,
   isProcessing: false,
+  isExporting: false,
+  exportProgress: 0,
   zoom: 1,
   panX: 0,
   panY: 0,
@@ -155,6 +163,10 @@ export const useEditorStore = create<EditorStore>((set) => ({
     set({ processedImage, tshirtImage, histogram, isProcessing: false }),
 
   setIsProcessing: (isProcessing) => set({ isProcessing }),
+
+  setIsExporting: (isExporting) => set({ isExporting }),
+
+  setExportProgress: (exportProgress) => set({ exportProgress }),
 
   setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(10, zoom)) }),
 
