@@ -101,10 +101,11 @@ ctx.addEventListener("message", async (e: MessageEvent<ProcessMessage>) => {
   applyGrayscale(imageData.data);
   applyCurveLUT(imageData.data, curveLUT);
 
-  // Print version: create bitmap directly from ImageData (avoids canvas premultiply)
+  // Print version: create bitmap directly from ImageData
   const printBitmap = await createImageBitmap(imageData);
 
-  // Tshirt version: clone processed data, apply threshold, create bitmap directly
+  // Tshirt version: clone processed data, apply threshold, create bitmap
+  // (kept for future batch export; preview now uses print bitmap + on-the-fly threshold)
   const tshirtData = new ImageData(
     new Uint8ClampedArray(imageData.data),
     width,

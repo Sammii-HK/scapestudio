@@ -6,56 +6,33 @@ import { CropOverlay } from "@/components/editor/CropOverlay";
 
 const CHECKERBOARD_SIZE = 12;
 
-function drawCheckerboard(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number
-) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-
-  const light = "#1e1e1e";
-  const dark = "#121212";
-
-  for (let row = Math.floor(y / CHECKERBOARD_SIZE); row * CHECKERBOARD_SIZE < y + h; row++) {
-    for (let col = Math.floor(x / CHECKERBOARD_SIZE); col * CHECKERBOARD_SIZE < x + w; col++) {
-      ctx.fillStyle = (row + col) % 2 === 0 ? light : dark;
-      ctx.fillRect(
-        col * CHECKERBOARD_SIZE,
-        row * CHECKERBOARD_SIZE,
-        CHECKERBOARD_SIZE,
-        CHECKERBOARD_SIZE
-      );
-    }
-  }
-  ctx.restore();
-}
-
 /**
  * Draw the tshirt preview showing only the cropped region, fit to the available area.
+ *
+ * Uses the fully-opaque PRINT bitmap and applies threshold knockout AFTER scaling,
+ * so the browser never interpolates semi-transparent pixels during resize (which
+ * causes dark-pixel colour to bleed into whites, dulling the entire image).
  */
 function drawTshirtCropped(
   ctx: CanvasRenderingContext2D,
-  tshirtImg: ImageBitmap,
+  printImg: ImageBitmap,
   crop: { x: number; y: number; width: number; height: number },
   areaX: number,
   areaY: number,
   areaW: number,
   areaH: number,
   background: string,
+  threshold: number,
+  feather: number,
   zoom: number,
   panX: number,
   panY: number
 ) {
-  // Source region in the tshirt bitmap (crop is normalized 0-1)
-  const sx = crop.x * tshirtImg.width;
-  const sy = crop.y * tshirtImg.height;
-  const sw = crop.width * tshirtImg.width;
-  const sh = crop.height * tshirtImg.height;
+  // Source region in the bitmap (crop is normalized 0-1)
+  const sx = crop.x * printImg.width;
+  const sy = crop.y * printImg.height;
+  const sw = crop.width * printImg.width;
+  const sh = crop.height * printImg.height;
 
   // Fit cropped region into available area
   const fitScale = Math.min(
@@ -67,16 +44,53 @@ function drawTshirtCropped(
   const dx = areaX + (areaW - displayW) / 2 + panX;
   const dy = areaY + (areaH - displayH) / 2 + panY;
 
-  // Background
+  const tw = Math.max(1, Math.ceil(displayW));
+  const th = Math.max(1, Math.ceil(displayH));
+  const temp = new OffscreenCanvas(tw, th);
+  const tc = temp.getContext("2d")!;
+  tc.imageSmoothingEnabled = true;
+  tc.imageSmoothingQuality = "high";
+
+  // 1. Draw the fully-opaque print image at display size (no alpha = clean scaling)
+  tc.drawImage(printImg, sx, sy, sw, sh, 0, 0, tw, th);
+
+  // 2. Apply threshold knockout to the already-scaled pixels
+  const imageData = tc.getImageData(0, 0, tw, th);
+  const data = imageData.data;
+  const lower = Math.max(0, threshold - feather);
+  for (let i = 0; i < data.length; i += 4) {
+    const lum = data[i]; // grayscale: R=G=B
+    if (lum <= lower) {
+      data[i + 3] = 0;
+    } else if (lum <= threshold && feather > 0) {
+      data[i + 3] = Math.round(((lum - lower) / feather) * 255);
+    }
+  }
+  tc.putImageData(imageData, 0, 0);
+
+  // 3. Fill background behind the knockout using destination-over
+  tc.globalCompositeOperation = "destination-over";
   if (background === "checkerboard") {
-    drawCheckerboard(ctx, dx, dy, displayW, displayH);
+    const light = "#1e1e1e";
+    const dark = "#121212";
+    for (let row = 0; row * CHECKERBOARD_SIZE < th; row++) {
+      for (let col = 0; col * CHECKERBOARD_SIZE < tw; col++) {
+        tc.fillStyle = (row + col) % 2 === 0 ? light : dark;
+        tc.fillRect(
+          col * CHECKERBOARD_SIZE,
+          row * CHECKERBOARD_SIZE,
+          CHECKERBOARD_SIZE,
+          CHECKERBOARD_SIZE
+        );
+      }
+    }
   } else {
-    ctx.fillStyle = background;
-    ctx.fillRect(dx, dy, displayW, displayH);
+    tc.fillStyle = background;
+    tc.fillRect(0, 0, tw, th);
   }
 
-  // Draw cropped region
-  ctx.drawImage(tshirtImg, sx, sy, sw, sh, dx, dy, displayW, displayH);
+  // 4. Blit the fully-opaque composited result to the main canvas
+  ctx.drawImage(temp, dx, dy, displayW, displayH);
 }
 
 export function EditorCanvas() {
@@ -84,8 +98,9 @@ export function EditorCanvas() {
   const containerRef = useRef<HTMLDivElement>(null);
   const sourceImage = useEditorStore((s) => s.sourceImage);
   const processedImage = useEditorStore((s) => s.processedImage);
-  const tshirtImage = useEditorStore((s) => s.tshirtImage);
   const crop = useEditorStore((s) => s.crop);
+  const threshold = useEditorStore((s) => s.threshold);
+  const feather = useEditorStore((s) => s.feather);
   const previewMode = useEditorStore((s) => s.previewMode);
   const tshirtBackground = useEditorStore((s) => s.tshirtBackground);
   const zoom = useEditorStore((s) => s.zoom);
@@ -165,7 +180,6 @@ export function EditorCanvas() {
     ctx.imageSmoothingQuality = "high";
 
     const printImg = processedImage ?? sourceImage;
-    const tshirtImg = tshirtImage;
     const ir = imageRect;
 
     if (previewMode === "split") {
@@ -189,16 +203,18 @@ export function EditorCanvas() {
       ctx.rect(halfW + 1, 0, halfW - 1, containerSize.height);
       ctx.clip();
 
-      if (tshirtImg) {
+      if (processedImage) {
         drawTshirtCropped(
           ctx,
-          tshirtImg,
+          processedImage,
           crop,
           halfW + 1,
           0,
           halfW - 1,
           containerSize.height,
           tshirtBackground,
+          threshold,
+          feather,
           zoom,
           panX,
           panY
@@ -217,23 +233,25 @@ export function EditorCanvas() {
       ctx.drawImage(printImg, ir.x, ir.y, ir.width, ir.height);
 
     } else if (previewMode === "tshirt") {
-      if (tshirtImg) {
+      if (processedImage) {
         drawTshirtCropped(
           ctx,
-          tshirtImg,
+          processedImage,
           crop,
           0,
           0,
           containerSize.width,
           containerSize.height,
           tshirtBackground,
+          threshold,
+          feather,
           zoom,
           panX,
           panY
         );
       }
     }
-  }, [sourceImage, processedImage, tshirtImage, crop, containerSize, imageRect, previewMode, tshirtBackground, zoom, panX, panY]);
+  }, [sourceImage, processedImage, crop, containerSize, imageRect, previewMode, tshirtBackground, threshold, feather, zoom, panX, panY]);
 
   // Mouse wheel zoom
   const handleWheel = useCallback(
