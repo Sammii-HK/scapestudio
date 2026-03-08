@@ -37,11 +37,49 @@ export function ImageUpload() {
   );
 
   const handleDrop = useCallback(
-    (e: React.DragEvent) => {
+    async (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
+
+      // Standard file drop (Finder, desktop, etc.)
       const file = e.dataTransfer.files[0];
-      if (file) handleFile(file);
+      if (file) {
+        handleFile(file);
+        return;
+      }
+
+      // macOS Photos app drops a URL or promise instead of a file.
+      // Try to extract an image URL and fetch it as a blob.
+      const url =
+        e.dataTransfer.getData("text/uri-list") ||
+        e.dataTransfer.getData("text/plain");
+
+      if (url && url.startsWith("http")) {
+        try {
+          const res = await fetch(url);
+          const blob = await res.blob();
+          if (blob.type.startsWith("image/")) {
+            const fetched = new File([blob], "photo.jpg", { type: blob.type });
+            handleFile(fetched);
+            return;
+          }
+        } catch {
+          // Fall through to items check
+        }
+      }
+
+      // Also check dataTransfer items for image content (clipboard-style drops)
+      for (const item of Array.from(e.dataTransfer.items)) {
+        if (item.kind === "file" && item.type.startsWith("image/")) {
+          const itemFile = item.getAsFile();
+          if (itemFile) {
+            handleFile(itemFile);
+            return;
+          }
+        }
+      }
+
+      setError("Could not read the image. Try exporting from Photos as JPEG first, or click to browse.");
     },
     [handleFile]
   );
