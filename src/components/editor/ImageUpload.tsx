@@ -1,33 +1,84 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Upload, ImageIcon } from "lucide-react";
+import { Upload, ImageIcon, Loader2 } from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor-store";
 
-const ACCEPTED_TYPES = [
+// MIME types for validation (macOS often reports HEIC as "" or "application/octet-stream")
+const IMAGE_MIMES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
   "image/heic",
   "image/heif",
-];
+]);
+
+// File picker accept string — include extensions so macOS shows HEIC files
+const FILE_ACCEPT = "image/jpeg,image/png,image/webp,.heic,.heif";
+
+// HEIC magic byte detection — reads file header to identify HEIC regardless of
+// MIME type or extension (macOS Photos often provides neither)
+async function hasHeicSignature(file: File): Promise<boolean> {
+  try {
+    const buffer = await file.slice(0, 12).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    // HEIC files have an "ftyp" box at offset 4
+    if (bytes[4] !== 0x66 || bytes[5] !== 0x74 || bytes[6] !== 0x79 || bytes[7] !== 0x70) {
+      return false;
+    }
+    const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
+    return ["heic", "heix", "mif1", "msf1", "hevc"].includes(brand);
+  } catch {
+    return false;
+  }
+}
+
+function isAcceptedImage(file: File): boolean {
+  if (IMAGE_MIMES.has(file.type)) return true;
+  if (file.type === "" || file.type === "application/octet-stream") return true; // let magic bytes decide later
+  return /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+}
 
 export function ImageUpload() {
   const setSourceImage = useEditorStore((s) => s.setSourceImage);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [converting, setConverting] = useState(false);
 
   const handleFile = useCallback(
     async (file: File) => {
       setError(null);
 
-      if (!ACCEPTED_TYPES.includes(file.type) && !file.name.match(/\.heic$/i)) {
-        setError("Unsupported file type. Use JPG, PNG, WebP, or HEIC.");
+      if (!isAcceptedImage(file)) {
+        setError(`Unsupported file type (${file.type || "unknown"}). Use JPG, PNG, WebP, or HEIC.`);
         return;
       }
 
       try {
-        const bitmap = await createImageBitmap(file);
+        let imageSource: Blob = file;
+
+        // Detect HEIC via magic bytes — MIME type and extension are unreliable on macOS
+        const isHeic =
+          file.type === "image/heic" ||
+          file.type === "image/heif" ||
+          /\.heic$/i.test(file.name) ||
+          (await hasHeicSignature(file));
+
+        if (isHeic) {
+          setConverting(true);
+          try {
+            const heic2any = (await import("heic2any")).default;
+            const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.95 });
+            imageSource = Array.isArray(converted) ? converted[0] : converted;
+          } catch {
+            setError("Failed to convert HEIC. Try exporting as JPEG from Photos.");
+            setConverting(false);
+            return;
+          }
+          setConverting(false);
+        }
+
+        const bitmap = await createImageBitmap(imageSource);
         setSourceImage(bitmap, file.name);
       } catch {
         setError("Failed to load image. Try exporting as JPEG from Photos.");
@@ -70,9 +121,9 @@ export function ImageUpload() {
 
       // Also check dataTransfer items for image content (clipboard-style drops)
       for (const item of Array.from(e.dataTransfer.items)) {
-        if (item.kind === "file" && item.type.startsWith("image/")) {
+        if (item.kind === "file") {
           const itemFile = item.getAsFile();
-          if (itemFile) {
+          if (itemFile && isAcceptedImage(itemFile)) {
             handleFile(itemFile);
             return;
           }
@@ -97,7 +148,7 @@ export function ImageUpload() {
   const handleClick = useCallback(() => {
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ACCEPTED_TYPES.join(",");
+    input.accept = FILE_ACCEPT;
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) handleFile(file);
@@ -120,7 +171,9 @@ export function ImageUpload() {
         }`}
       >
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
-          {isDragging ? (
+          {converting ? (
+            <Loader2 className="h-6 w-6 text-primary animate-spin" />
+          ) : isDragging ? (
             <ImageIcon className="h-6 w-6 text-primary" />
           ) : (
             <Upload className="h-6 w-6 text-muted-foreground" />
@@ -128,7 +181,11 @@ export function ImageUpload() {
         </div>
         <div className="text-center">
           <p className="text-sm font-medium text-foreground">
-            {isDragging ? "Drop image here" : "Drop an image or click to browse"}
+            {converting
+              ? "Converting HEIC..."
+              : isDragging
+                ? "Drop image here"
+                : "Drop an image or click to browse"}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             JPG, PNG, WebP, or HEIC

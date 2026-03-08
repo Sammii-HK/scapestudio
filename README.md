@@ -6,6 +6,8 @@ A browser-based photo editing tool built for fine art photographers and print pr
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
 
+![ScapeStudio split view showing print and t-shirt preview](screenshot.png)
+
 ## What It Does
 
 ScapeStudio takes a photograph and produces two outputs: a **grayscale print-ready image** and a **transparent-background t-shirt-ready image** — exported at multiple physical sizes (25cm, 50cm, 70cm at 300 DPI) and bundled into a single ZIP download.
