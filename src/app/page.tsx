@@ -2,6 +2,7 @@
 
 import { useEditorStore } from "@/lib/store/editor-store";
 import { useImageProcessing } from "@/hooks/use-image-processing";
+import { useNativeShare } from "@/hooks/use-native-share";
 import { ImageUpload } from "@/components/editor/ImageUpload";
 import { EditorCanvas } from "@/components/editor/EditorCanvas";
 import { Toolbar } from "@/components/editor/Toolbar";
@@ -24,6 +25,11 @@ export default function Home() {
 
   // Trigger processing whenever source/curves/threshold change
   useImageProcessing();
+  // Mounted unconditionally at the page root (not under the sourceImage
+  // check below) so window.__scapeShareReceived exists as early as
+  // possible - the native side polls for it briefly on cold launch, but
+  // that window is only a few seconds.
+  useNativeShare();
 
   const isDefaultCurves =
     curves.length === 2 &&
