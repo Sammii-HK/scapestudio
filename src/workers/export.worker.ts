@@ -2,8 +2,8 @@
 
 /**
  * Web Worker for batch export.
- * Produces print (grayscale + curves) and tshirt (+ threshold knockout) PNGs
- * at multiple target sizes.
+ * Produces print (grayscale + curves), tshirt (+ threshold knockout), and
+ * canvas (full-colour, unprocessed) PNGs at multiple target sizes.
  */
 
 export interface ExportSizeSpec {
@@ -21,6 +21,8 @@ export interface ExportMessage {
   crop: { x: number; y: number; width: number; height: number };
   sizes: ExportSizeSpec[];
   fileName: string;
+  /** Include the full-colour, unprocessed canvas variant. Defaults to true. */
+  includeCanvas?: boolean;
 }
 
 export interface ExportProgress {
@@ -78,9 +80,19 @@ const ctx = self as unknown as DedicatedWorkerGlobalScope;
 ctx.addEventListener("message", async (e: MessageEvent<ExportMessage>) => {
   if (e.data.type !== "export") return;
 
-  const { sourceImageBitmap, curveLUT, threshold, feather, crop, sizes, fileName } = e.data;
+  const {
+    sourceImageBitmap,
+    curveLUT,
+    threshold,
+    feather,
+    crop,
+    sizes,
+    fileName,
+    includeCanvas = true,
+  } = e.data;
 
-  const total = sizes.length * 2; // 2 outputs per size (print + tshirt)
+  const outputsPerSize = includeCanvas ? 3 : 2; // print + tshirt (+ canvas)
+  const total = sizes.length * outputsPerSize;
   let current = 0;
   const files: Array<{ name: string; blob: Blob }> = [];
 
@@ -103,6 +115,19 @@ ctx.addEventListener("message", async (e: MessageEvent<ExportMessage>) => {
       srcX, srcY, srcW, srcH,
       0, 0, widthPx, heightPx
     );
+
+    // Canvas PNG: full-colour, unprocessed — capture before grayscale/curves
+    // are applied to the shared canvas context.
+    if (includeCanvas) {
+      const canvasBlob = await canvas.convertToBlob({ type: "image/png" });
+      files.push({
+        name: `canvas/${fileName}_canvas_${label}_${widthPx}px.png`,
+        blob: canvasBlob,
+      });
+
+      current++;
+      ctx.postMessage({ type: "progress", current, total } as ExportProgress);
+    }
 
     // Get pixel data and apply grayscale + curves
     const imageData = canvasCtx.getImageData(0, 0, widthPx, heightPx);

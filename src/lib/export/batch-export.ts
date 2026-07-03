@@ -89,6 +89,7 @@ export async function runExport(
         crop,
         sizes,
         fileName: baseName,
+        includeCanvas: true,
       },
       [bitmapCopy]
     );
