@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import { withPngDpi } from "../lib/export/png-metadata";
 
 /**
  * Web Worker for batch export.
@@ -8,6 +9,7 @@
 
 export interface ExportSizeSpec {
   label: string;
+  dpi: number;
   widthPx: number;
   heightPx: number;
 }
@@ -59,7 +61,7 @@ function applyCurveLUT(data: Uint8ClampedArray, lut: Uint8Array): void {
 function applyThreshold(
   data: Uint8ClampedArray,
   threshold: number,
-  feather: number
+  feather: number,
 ): void {
   const lower = Math.max(0, threshold - feather);
 
@@ -102,66 +104,93 @@ ctx.addEventListener("message", async (e: MessageEvent<ExportMessage>) => {
   const srcW = Math.round(crop.width * sourceImageBitmap.width);
   const srcH = Math.round(crop.height * sourceImageBitmap.height);
 
-  for (const size of sizes) {
-    const { label, widthPx, heightPx } = size;
+  try {
+    for (const size of sizes) {
+      const { label, widthPx, heightPx } = size;
 
-    // Create canvas at target dimensions
-    const canvas = new OffscreenCanvas(widthPx, heightPx);
-    const canvasCtx = canvas.getContext("2d")!;
+      // Create canvas at target dimensions
+      const canvas = new OffscreenCanvas(widthPx, heightPx);
+      const canvasCtx = canvas.getContext("2d")!;
 
-    // Draw cropped region scaled to target size
-    canvasCtx.drawImage(
-      sourceImageBitmap,
-      srcX, srcY, srcW, srcH,
-      0, 0, widthPx, heightPx
-    );
+      // Draw cropped region scaled to target size
+      canvasCtx.drawImage(
+        sourceImageBitmap,
+        srcX,
+        srcY,
+        srcW,
+        srcH,
+        0,
+        0,
+        widthPx,
+        heightPx,
+      );
 
-    // Canvas PNG: full-colour, unprocessed — capture before grayscale/curves
-    // are applied to the shared canvas context.
-    if (includeCanvas) {
-      const canvasBlob = await canvas.convertToBlob({ type: "image/png" });
+      // Canvas PNG: full-colour, unprocessed — capture before grayscale/curves
+      // are applied to the shared canvas context.
+      if (includeCanvas) {
+        const canvasBlob = await withPngDpi(
+          await canvas.convertToBlob({ type: "image/png" }),
+          size.dpi,
+        );
+        files.push({
+          name: `canvas/${fileName}_canvas_${label}_${widthPx}px.png`,
+          blob: canvasBlob,
+        });
+
+        current++;
+        ctx.postMessage({ type: "progress", current, total } as ExportProgress);
+      }
+
+      // Get pixel data and apply grayscale + curves
+      const imageData = canvasCtx.getImageData(0, 0, widthPx, heightPx);
+      applyGrayscale(imageData.data);
+      applyCurveLUT(imageData.data, curveLUT);
+
+      // Print PNG: put processed data back and export
+      canvasCtx.putImageData(imageData, 0, 0);
+      const printBlob = await withPngDpi(
+        await canvas.convertToBlob({ type: "image/png" }),
+        size.dpi,
+      );
       files.push({
-        name: `canvas/${fileName}_canvas_${label}_${widthPx}px.png`,
-        blob: canvasBlob,
+        name: `print/${fileName}_print_${label}_${widthPx}px.png`,
+        blob: printBlob,
+      });
+
+      current++;
+      ctx.postMessage({ type: "progress", current, total } as ExportProgress);
+
+      // Tshirt PNG: clone data, apply threshold, export
+      const tshirtData = new ImageData(
+        new Uint8ClampedArray(imageData.data),
+        widthPx,
+        heightPx,
+      );
+      applyThreshold(tshirtData.data, threshold, feather);
+      canvasCtx.putImageData(tshirtData, 0, 0);
+      const tshirtBlob = await withPngDpi(
+        await canvas.convertToBlob({ type: "image/png" }),
+        size.dpi,
+      );
+      files.push({
+        name: `tshirt/${fileName}_tshirt_${label}_${widthPx}px.png`,
+        blob: tshirtBlob,
       });
 
       current++;
       ctx.postMessage({ type: "progress", current, total } as ExportProgress);
     }
 
-    // Get pixel data and apply grayscale + curves
-    const imageData = canvasCtx.getImageData(0, 0, widthPx, heightPx);
-    applyGrayscale(imageData.data);
-    applyCurveLUT(imageData.data, curveLUT);
-
-    // Print PNG: put processed data back and export
-    canvasCtx.putImageData(imageData, 0, 0);
-    const printBlob = await canvas.convertToBlob({ type: "image/png" });
-    files.push({
-      name: `print/${fileName}_print_${label}_${widthPx}px.png`,
-      blob: printBlob,
+    ctx.postMessage({ type: "done", files } as ExportDone);
+  } catch (error) {
+    ctx.postMessage({
+      type: "error",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Export failed. Try a smaller print width.",
     });
-
-    current++;
-    ctx.postMessage({ type: "progress", current, total } as ExportProgress);
-
-    // Tshirt PNG: clone data, apply threshold, export
-    const tshirtData = new ImageData(
-      new Uint8ClampedArray(imageData.data),
-      widthPx,
-      heightPx
-    );
-    applyThreshold(tshirtData.data, threshold, feather);
-    canvasCtx.putImageData(tshirtData, 0, 0);
-    const tshirtBlob = await canvas.convertToBlob({ type: "image/png" });
-    files.push({
-      name: `tshirt/${fileName}_tshirt_${label}_${widthPx}px.png`,
-      blob: tshirtBlob,
-    });
-
-    current++;
-    ctx.postMessage({ type: "progress", current, total } as ExportProgress);
+  } finally {
+    sourceImageBitmap.close();
   }
-
-  ctx.postMessage({ type: "done", files } as ExportDone);
 });

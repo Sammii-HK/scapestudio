@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useEditorStore } from "@/lib/store/editor-store";
 import {
   getAllPresets,
@@ -40,13 +40,23 @@ export function PresetManager() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [presetToDelete, setPresetToDelete] = useState<Preset | null>(null);
   const [newPresetName, setNewPresetName] = useState("");
-  const hasLoaded = useRef<boolean | null>(null);
-
-  // Load presets on first render (null-check pattern per React rules)
-  if (hasLoaded.current == null) {
-    hasLoaded.current = true;
-    getAllPresets().then(setPresets);
-  }
+  const [presetError, setPresetError] = useState("");
+  useEffect(() => {
+    let active = true;
+    getAllPresets()
+      .then((items) => {
+        if (active) setPresets(items);
+      })
+      .catch(() => {
+        if (active)
+          setPresetError(
+            "Saved presets are unavailable. You can still edit and export.",
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Derive isModified from current state (no effect needed)
   const isModified = useMemo(() => {
@@ -72,7 +82,7 @@ export function PresetManager() {
       setThreshold(preset.threshold);
       setActivePresetId(preset.id);
     },
-    [setCurves, setThreshold]
+    [setCurves, setThreshold],
   );
 
   // Save current settings as new preset
@@ -121,6 +131,11 @@ export function PresetManager() {
 
   return (
     <div className="space-y-2">
+      {presetError && (
+        <p role="alert" className="text-xs text-destructive">
+          {presetError}
+        </p>
+      )}
       {/* Preset selector */}
       <div className="flex items-center gap-1.5">
         <DropdownMenu>
@@ -128,7 +143,8 @@ export function PresetManager() {
             <Button
               variant="secondary"
               size="sm"
-              className="h-7 flex-1 justify-between gap-1 px-2 text-xs"
+              aria-label="Choose a tone preset"
+              className="h-11 flex-1 justify-between gap-1 px-2 text-xs"
             >
               <span className="truncate">{displayName}</span>
               <ChevronDown className="h-3 w-3 shrink-0 opacity-50" />
@@ -138,7 +154,7 @@ export function PresetManager() {
             {presets.map((preset) => (
               <DropdownMenuItem
                 key={preset.id}
-                className="flex items-center justify-between text-xs"
+                className="flex min-h-11 items-center justify-between text-xs"
                 onClick={() => applyPreset(preset)}
               >
                 <span>{preset.name}</span>
@@ -149,7 +165,7 @@ export function PresetManager() {
             ))}
             {presets.length > 0 && <DropdownMenuSeparator />}
             <DropdownMenuItem
-              className="text-xs"
+              className="min-h-11 text-xs"
               onClick={() => {
                 setNewPresetName("");
                 setSaveDialogOpen(true);
@@ -166,9 +182,16 @@ export function PresetManager() {
           <Button
             variant="secondary"
             size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={handleUpdate}
+            className="h-11 min-w-11 px-2 text-xs"
+            onClick={() => {
+              void handleUpdate().catch(() =>
+                setPresetError(
+                  "Your preset could not be updated. Your edits are still available.",
+                ),
+              );
+            }}
             title="Update preset with current settings"
+            aria-label="Update preset with current settings"
           >
             <Save className="h-3 w-3" />
           </Button>
@@ -178,12 +201,13 @@ export function PresetManager() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+            className="h-11 min-w-11 px-2 text-xs text-muted-foreground hover:text-destructive"
             onClick={() => {
               setPresetToDelete(activePreset ?? null);
               setDeleteDialogOpen(true);
             }}
             title="Delete preset"
+            aria-label="Delete preset"
           >
             <Trash2 className="h-3 w-3" />
           </Button>
@@ -197,11 +221,18 @@ export function PresetManager() {
             <DialogTitle>Save Preset</DialogTitle>
           </DialogHeader>
           <Input
+            aria-label="Preset name"
             placeholder="Preset name"
             value={newPresetName}
             onChange={(e) => setNewPresetName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") handleSaveNew();
+              if (e.key === "Enter") {
+                void handleSaveNew().catch(() =>
+                  setPresetError(
+                    "Your preset could not be saved. Your edits are still available.",
+                  ),
+                );
+              }
             }}
             autoFocus
           />
@@ -215,7 +246,13 @@ export function PresetManager() {
             </Button>
             <Button
               size="sm"
-              onClick={handleSaveNew}
+              onClick={() => {
+                void handleSaveNew().catch(() =>
+                  setPresetError(
+                    "Your preset could not be saved. Your edits are still available.",
+                  ),
+                );
+              }}
               disabled={!newPresetName.trim()}
             >
               Save
@@ -231,7 +268,8 @@ export function PresetManager() {
             <DialogTitle>Delete Preset</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Delete &ldquo;{presetToDelete?.name}&rdquo;? This can&apos;t be undone.
+            Delete &ldquo;{presetToDelete?.name}&rdquo;? This can&apos;t be
+            undone.
           </p>
           <DialogFooter>
             <Button
@@ -244,7 +282,11 @@ export function PresetManager() {
             <Button
               variant="destructive"
               size="sm"
-              onClick={handleDelete}
+              onClick={() => {
+                void handleDelete().catch(() =>
+                  setPresetError("Your preset could not be deleted."),
+                );
+              }}
             >
               Delete
             </Button>

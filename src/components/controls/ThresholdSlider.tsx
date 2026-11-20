@@ -16,20 +16,32 @@ export function ThresholdSlider() {
       {/* Main threshold slider */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs text-muted-foreground">Black Knockout</Label>
+          <Label
+            htmlFor="black-knockout"
+            className="text-xs text-muted-foreground"
+          >
+            Black knockout
+          </Label>
           <Input
             type="number"
             min={0}
             max={255}
+            id="black-knockout"
             value={threshold}
-            onChange={(e) => setThreshold(Math.max(0, Math.min(255, Number(e.target.value) || 0)))}
-            className="h-6 w-14 px-1.5 text-center font-mono text-xs"
+            onChange={(e) =>
+              setThreshold(
+                Math.max(0, Math.min(255, Number(e.target.value) || 0)),
+              )
+            }
+            className="h-11 w-16 px-1.5 text-center font-mono text-xs"
           />
         </div>
         <Slider
           min={0}
           max={255}
           step={1}
+          aria-label="Black knockout"
+          className="min-h-11"
           value={[threshold]}
           onValueChange={([v]) => setThreshold(v)}
         />
@@ -38,20 +50,27 @@ export function ThresholdSlider() {
       {/* Feather slider */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label className="text-xs text-muted-foreground">Feather</Label>
+          <Label htmlFor="feather" className="text-xs text-muted-foreground">
+            Feather
+          </Label>
           <Input
             type="number"
             min={0}
             max={50}
+            id="feather"
             value={feather}
-            onChange={(e) => setFeather(Math.max(0, Math.min(50, Number(e.target.value) || 0)))}
-            className="h-6 w-14 px-1.5 text-center font-mono text-xs"
+            onChange={(e) =>
+              setFeather(Math.max(0, Math.min(50, Number(e.target.value) || 0)))
+            }
+            className="h-11 w-16 px-1.5 text-center font-mono text-xs"
           />
         </div>
         <Slider
           min={0}
           max={50}
           step={1}
+          aria-label="Feather"
+          className="min-h-11"
           value={[feather]}
           onValueChange={([v]) => setFeather(v)}
         />

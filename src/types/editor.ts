@@ -67,6 +67,6 @@ export const DEFAULT_CURVES: CurvePoints = [
 
 export const DEFAULT_EXPORT_SIZES: ExportSize[] = [
   { label: "Small", widthCm: 25, heightCm: 25, dpi: 300, enabled: true },
-  { label: "Medium", widthCm: 50, heightCm: 50, dpi: 300, enabled: true },
-  { label: "Large", widthCm: 70, heightCm: 70, dpi: 300, enabled: true },
+  { label: "Medium", widthCm: 50, heightCm: 50, dpi: 300, enabled: false },
+  { label: "Large", widthCm: 70, heightCm: 70, dpi: 300, enabled: false },
 ];

@@ -1,3 +1,4 @@
+import { exportDimensions } from "./export-plan";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { CurvePoints, ExportSize } from "@/types/editor";
@@ -17,20 +18,26 @@ type ProgressCallback = (progress: number) => void;
 
 export async function runExport(
   params: ExportParams,
-  onProgress: ProgressCallback
+  onProgress: ProgressCallback,
 ): Promise<void> {
-  const { sourceImage, curves, threshold, feather, crop, exportSizes, fileName } = params;
+  const {
+    sourceImage,
+    curves,
+    threshold,
+    feather,
+    crop,
+    exportSizes,
+    fileName,
+  } = params;
 
   const enabledSizes = exportSizes.filter((s) => s.enabled);
   if (enabledSizes.length === 0) return;
 
   const curveLUT = generateCurveLUT(curves);
 
-  const sizes = enabledSizes.map((s) => ({
-    label: s.label,
-    widthPx: Math.round((s.widthCm / 2.54) * s.dpi),
-    heightPx: Math.round((s.heightCm / 2.54) * s.dpi),
-  }));
+  const sizes = enabledSizes.map((size) =>
+    exportDimensions(size, sourceImage, crop),
+  );
 
   // Strip file extension from fileName for naming
   const baseName = fileName.replace(/\.[^.]+$/, "");
@@ -40,7 +47,7 @@ export async function runExport(
 
   return new Promise<void>((resolve, reject) => {
     const worker = new Worker(
-      new URL("../../workers/export.worker.ts", import.meta.url)
+      new URL("../../workers/export.worker.ts", import.meta.url),
     );
 
     worker.addEventListener("message", async (e) => {
@@ -49,6 +56,16 @@ export async function runExport(
       if (msg.type === "progress") {
         const pct = Math.round((msg.current / msg.total) * 100);
         onProgress(pct);
+      }
+
+      if (msg.type === "error") {
+        worker.terminate();
+        reject(
+          new Error(
+            msg.message ||
+              "The image could not be exported. Try a smaller print width.",
+          ),
+        );
       }
 
       if (msg.type === "done") {
@@ -91,7 +108,7 @@ export async function runExport(
         fileName: baseName,
         includeCanvas: true,
       },
-      [bitmapCopy]
+      [bitmapCopy],
     );
   });
 }

@@ -1,7 +1,17 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Upload, ImageIcon, Loader2 } from "lucide-react";
+import { useCallback, useState, useEffect, useRef } from "react";
+import {
+  Upload,
+  ImageIcon,
+  Loader2,
+  ArrowUpRight,
+  ShieldCheck,
+  Crop,
+  SlidersHorizontal,
+  Layers,
+} from "lucide-react";
+import { createSampleImage, drawSample } from "@/lib/image-processing/sample";
 import { useEditorStore } from "@/lib/store/editor-store";
 
 // MIME types for validation (macOS often reports HEIC as "" or "application/octet-stream")
@@ -23,7 +33,12 @@ async function hasHeicSignature(file: File): Promise<boolean> {
     const buffer = await file.slice(0, 12).arrayBuffer();
     const bytes = new Uint8Array(buffer);
     // HEIC files have an "ftyp" box at offset 4
-    if (bytes[4] !== 0x66 || bytes[5] !== 0x74 || bytes[6] !== 0x79 || bytes[7] !== 0x70) {
+    if (
+      bytes[4] !== 0x66 ||
+      bytes[5] !== 0x74 ||
+      bytes[6] !== 0x79 ||
+      bytes[7] !== 0x70
+    ) {
       return false;
     }
     const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
@@ -40,6 +55,10 @@ function isAcceptedImage(file: File): boolean {
 }
 
 export function ImageUpload() {
+  const sampleRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (sampleRef.current) drawSample(sampleRef.current);
+  }, []);
   const setSourceImage = useEditorStore((s) => s.setSourceImage);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +69,9 @@ export function ImageUpload() {
       setError(null);
 
       if (!isAcceptedImage(file)) {
-        setError(`Unsupported file type (${file.type || "unknown"}). Use JPG, PNG, WebP, or HEIC.`);
+        setError(
+          `Unsupported file type (${file.type || "unknown"}). Use JPG, PNG, WebP, or HEIC.`,
+        );
         return;
       }
 
@@ -68,10 +89,16 @@ export function ImageUpload() {
           setConverting(true);
           try {
             const heic2any = (await import("heic2any")).default;
-            const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.95 });
+            const converted = await heic2any({
+              blob: file,
+              toType: "image/jpeg",
+              quality: 0.95,
+            });
             imageSource = Array.isArray(converted) ? converted[0] : converted;
           } catch {
-            setError("Failed to convert HEIC. Try exporting as JPEG from Photos.");
+            setError(
+              "Failed to convert HEIC. Try exporting as JPEG from Photos.",
+            );
             setConverting(false);
             return;
           }
@@ -84,7 +111,7 @@ export function ImageUpload() {
         setError("Failed to load image. Try exporting as JPEG from Photos.");
       }
     },
-    [setSourceImage]
+    [setSourceImage],
   );
 
   const handleDrop = useCallback(
@@ -130,9 +157,11 @@ export function ImageUpload() {
         }
       }
 
-      setError("Could not read the image. Try exporting from Photos as JPEG first, or click to browse.");
+      setError(
+        "Could not read the image. Try exporting from Photos as JPEG first, or click to browse.",
+      );
     },
-    [handleFile]
+    [handleFile],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -156,45 +185,124 @@ export function ImageUpload() {
     input.click();
   }, [handleFile]);
 
+  const handleSample = async () => {
+    setError(null);
+    try {
+      setSourceImage(await createSampleImage(), "tonal-study.png");
+    } catch {
+      setError("The sample could not open. Choose an image instead.");
+    }
+  };
+
   return (
-    <div className="flex h-full w-full items-center justify-center p-8">
-      <button
-        type="button"
-        onClick={handleClick}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        className={`flex h-80 w-full max-w-lg cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-colors ${
-          isDragging
-            ? "border-primary bg-primary/5"
-            : "border-border hover:border-muted-foreground"
-        }`}
-      >
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
-          {converting ? (
-            <Loader2 className="h-6 w-6 text-primary animate-spin" />
-          ) : isDragging ? (
-            <ImageIcon className="h-6 w-6 text-primary" />
-          ) : (
-            <Upload className="h-6 w-6 text-muted-foreground" />
+    <div className="studio-welcome">
+      <div className="studio-welcome-grid">
+        <section
+          className="studio-welcome-copy"
+          aria-labelledby="welcome-heading"
+        >
+          <p className="studio-eyebrow">Your image. Ready for its next life.</p>
+          <h2 id="welcome-heading">
+            From photograph
+            <br />
+            to finished print.
+          </h2>
+          <p className="studio-intro">
+            Shape the crop and tone once. Take away a fine art print,
+            transparent artwork for apparel, and the original colour crop.
+          </p>
+          <button
+            type="button"
+            onClick={handleClick}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            disabled={converting}
+            className={`studio-dropzone ${isDragging ? "is-dragging" : ""}`}
+          >
+            {converting ? (
+              <Loader2
+                className="size-6 animate-spin motion-reduce:animate-none"
+                aria-hidden
+              />
+            ) : isDragging ? (
+              <ImageIcon className="size-6" aria-hidden />
+            ) : (
+              <Upload className="size-6" aria-hidden />
+            )}
+            <span className="font-medium">
+              {converting
+                ? "Converting your image"
+                : isDragging
+                  ? "Drop it here"
+                  : "Choose a photograph"}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              or drag it here. JPG, PNG, WebP and HEIC.
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSample}
+            className="studio-sample-link"
+          >
+            Try the tonal study <ArrowUpRight size={16} aria-hidden />
+          </button>
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              {error}
+            </p>
           )}
-        </div>
-        <div className="text-center">
-          <p className="text-sm font-medium text-foreground">
-            {converting
-              ? "Converting HEIC..."
-              : isDragging
-                ? "Drop image here"
-                : "Drop an image or click to browse"}
+          <p className="studio-privacy">
+            <ShieldCheck size={15} aria-hidden />
+            Images are processed on your device.
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            JPG, PNG, WebP, or HEIC
-          </p>
-        </div>
-        {error && (
-          <p className="text-xs text-destructive">{error}</p>
-        )}
-      </button>
+        </section>
+        <figure className="studio-study">
+          <div className="studio-study-top">
+            <span>Tonal study / 01</span>
+            <span>Synthetic sample</span>
+          </div>
+          <canvas
+            ref={sampleRef}
+            width={1200}
+            height={900}
+            aria-label="A synthetic mountain study with a range of light and dark tones"
+            role="img"
+          />
+          <figcaption>
+            <span>A little room to experiment.</span>
+            <span>Open it in the real editor.</span>
+          </figcaption>
+        </figure>
+      </div>
+      <div className="studio-workflow" aria-label="Editing workflow">
+        {[
+          {
+            Icon: Crop,
+            title: "Frame it",
+            detail: "A crop that keeps your proportions.",
+          },
+          {
+            Icon: SlidersHorizontal,
+            title: "Shape the light",
+            detail: "Curves, contrast and a live histogram.",
+          },
+          {
+            Icon: Layers,
+            title: "Make it material",
+            detail: "Print and apparel outputs, at your chosen widths.",
+          },
+        ].map(({ Icon, title, detail }) => (
+          <div key={title}>
+            <Icon size={19} aria-hidden />
+            <div>
+              <h3>{title}</h3>
+              <p>{detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

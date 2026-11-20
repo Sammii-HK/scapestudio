@@ -33,21 +33,25 @@ export default function Home() {
 
   const isDefaultCurves =
     curves.length === 2 &&
-    curves[0].x === 0 && curves[0].y === 0 &&
-    curves[1].x === 255 && curves[1].y === 255;
+    curves[0].x === 0 &&
+    curves[0].y === 0 &&
+    curves[1].x === 255 &&
+    curves[1].y === 255;
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden">
+    <div className="flex min-h-dvh w-full flex-col lg:h-dvh lg:overflow-hidden">
       <Toolbar />
-      <main className="flex flex-1 overflow-hidden">
+      <main className="flex min-h-0 flex-1 flex-col lg:flex-row lg:overflow-hidden">
         {/* Canvas area */}
-        <div className="flex-1">
+        <div
+          className={`min-w-0 ${sourceImage ? "h-[min(60dvh,560px)] min-h-80 shrink-0 lg:h-auto lg:min-h-0 lg:flex-1" : "flex-1"}`}
+        >
           {sourceImage ? <EditorCanvas /> : <ImageUpload />}
         </div>
 
         {/* Right panel */}
         {sourceImage && (
-          <aside className="flex w-72 flex-col overflow-y-auto border-l border-border bg-card">
+          <aside className="flex w-full shrink-0 flex-col border-t border-border bg-card lg:w-80 lg:overflow-y-auto lg:border-l lg:border-t-0">
             <CropControls />
             <Separator />
 
@@ -61,9 +65,10 @@ export default function Home() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="min-h-11 min-w-11"
                     onClick={() => setCurves(DEFAULT_CURVES)}
                     title="Reset curves"
+                    aria-label="Reset curves"
                   >
                     <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
                   </Button>

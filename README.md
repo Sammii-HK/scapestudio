@@ -1,65 +1,31 @@
 # ScapeStudio
 
-A browser-based photo editing tool built for fine art photographers and print professionals. ScapeStudio replaces a multi-step Photoshop workflow by letting users prepare images for both fine art prints and t-shirt prints simultaneously — all from a single interface.
+A local image-to-print workspace. Crop a photograph, shape its tone and export a colour crop, a grayscale print and transparent apparel artwork in one ZIP.
 
-![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)
+## Working in the editor
 
-![ScapeStudio split view showing print and t-shirt preview](screenshot.png)
+Choose a JPG, PNG, WebP or HEIC image, or open the clearly labelled synthetic tonal study. Images are processed on the device. The editor offers crop ratios, exact pixel controls, a histogram-backed curve, dark-tone knockout and feathering. Preview print and apparel results separately or side by side. Presets are stored in this browser using IndexedDB.
 
-## What It Does
+Choose physical print widths before exporting. Height follows the crop proportions. Each selected width produces three PNGs with 300 DPI density metadata. Apparel transparency is based on luminance: it removes dark tones, not objects or backgrounds identified by a model. Enlarging a small source changes its output dimensions, not the detail in the original photograph.
 
-ScapeStudio takes a photograph and produces two outputs: a **grayscale print-ready image** and a **transparent-background t-shirt-ready image** — exported at multiple physical sizes (25cm, 50cm, 70cm at 300 DPI) and bundled into a single ZIP download.
+## Development
 
-### Core Features
+Use Node 24 or newer. The web application uses Next.js, React, TypeScript, Zustand and Radix components, with Lucide icons.
 
-- **Non-destructive editing pipeline** — Crop, convert to B&W, adjust curves, and apply threshold knockout without ever modifying the source image
-- **Interactive curves editor** — Drag control points on a bezier curve to fine-tune tonality, with a real-time histogram overlay showing tonal distribution
-- **Threshold knockout** — Convert dark pixels to transparency for t-shirt printing, with a feather/softness control for smooth edges
-- **Dual preview** — Side-by-side split view comparing the print version against the t-shirt version in real time
-- **Preset system** — Save and load curves + threshold combinations, with built-in defaults like "High Contrast" and "Soft & Airy", persisted to IndexedDB
-- **Batch multi-size export** — Generate print and t-shirt PNGs at 3 sizes (up to 8268px), packaged into a ZIP
-
-## How It Works
-
-```
-Source Photo (color)
-      |
-  [Web Worker]
-      |
-  Grayscale ─── Curves LUT ─── Print Output (PNG)
-                    |
-              Threshold Knockout ─── T-Shirt Output (transparent PNG)
-```
-
-All heavy image processing runs **off the main thread** via Web Workers with `OffscreenCanvas`, keeping the UI responsive during editing and export. The curves engine uses **monotone cubic Hermite interpolation** (Fritsch-Carlson method) to build a 256-entry lookup table, ensuring smooth tonal adjustments without overshoot.
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router) + React 19 |
-| Language | TypeScript (strict mode) |
-| Styling | Tailwind CSS 4 + shadcn/ui + Radix primitives |
-| State | Zustand |
-| Image Processing | Canvas 2D API + Web Workers + OffscreenCanvas |
-| Storage | IndexedDB (presets persistence) |
-| Export | JSZip (multi-file ZIP bundling) |
-
-## Technical Highlights
-
-- **Web Worker architecture** — Two dedicated workers: one for real-time preview processing (debounced at 100ms), another for high-resolution export rendering
-- **Threshold-after-scaling** — Knockout is applied after resizing to prevent bilinear interpolation from bleeding alpha into edges
-- **Zero-copy transfers** — `ImageBitmap` objects are transferred (not copied) between workers and the main thread for memory efficiency
-- **Normalized crop coordinates** — All crop values stored as 0-1 ratios, making them resolution-independent
-- **DPI-aware export** — Physical dimensions (cm) are converted to pixel dimensions at 300 DPI for print-lab-ready output
-
-## Getting Started
-
-```bash
+```sh
 npm install
 npm run dev
+npm run lint
+npm run typecheck
+npm test
+npm run test:icons
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Preview and export work run in separate Web Workers using OffscreenCanvas. Preview processing is debounced and limited to a 2,000-pixel maximum dimension. Exports use a copy of the original bitmap. Tone curves use a monotone cubic Hermite lookup table; the alpha feather is a luminance interval rather than an image blur.
+
+## Verification and limits
+
+The 20 November 2026 local review decoded a ZIP from the real desktop editor: three 2,953 by 2,215 PNGs, approximately 300 DPI, with transparency present in the apparel version. Five tests cover proportional dimensions, invalid export inputs, crop orientation and PNG density metadata. Eight icon guard tests check the shared Lucide policy.
+
+The 390-pixel workspace was checked without horizontal overflow. Final browser checks for the later crop/touch controls remain open after the browser connection stopped responding. Large photograph memory limits, HEIC across browsers, assistive technology and native iOS delivery still need verification. This is a local release candidate, not confirmation that the deployed site includes these changes.

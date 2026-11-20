@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditorStore } from "@/lib/store/editor-store";
 import { generateCurveLUT } from "@/lib/image-processing/curves";
+import { Plus, X } from "lucide-react";
 import type { CurvePoint } from "@/types/editor";
 
 const CANVAS_SIZE = 200;
@@ -21,7 +22,9 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
-  const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number } | null>(null);
+  const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number } | null>(
+    null,
+  );
 
   // Convert curve coords (0-255) to canvas coords
   const toCanvas = useCallback(
@@ -29,16 +32,18 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
       cx: PADDING + (p.x / 255) * INNER,
       cy: PADDING + (1 - p.y / 255) * INNER,
     }),
-    []
+    [],
   );
 
   // Convert canvas coords to curve coords (0-255)
   const fromCanvas = useCallback(
     (cx: number, cy: number): CurvePoint => ({
       x: Math.round(Math.max(0, Math.min(255, ((cx - PADDING) / INNER) * 255))),
-      y: Math.round(Math.max(0, Math.min(255, (1 - (cy - PADDING) / INNER) * 255))),
+      y: Math.round(
+        Math.max(0, Math.min(255, (1 - (cy - PADDING) / INNER) * 255)),
+      ),
     }),
-    []
+    [],
   );
 
   // Draw the curves editor
@@ -139,7 +144,7 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
       ctx.fillText(
         `${hoverInfo.x}, ${hoverInfo.y}`,
         CANVAS_SIZE - PADDING,
-        CANVAS_SIZE - 2
+        CANVAS_SIZE - 2,
       );
     }
   }, [curves, histogram, draggingIdx, hoverInfo, toCanvas]);
@@ -166,23 +171,24 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
 
       return nearestDist < POINT_RADIUS * 3 ? nearestIdx : null;
     },
-    [curves, toCanvas]
+    [curves, toCanvas],
   );
 
   const getCanvasPos = useCallback(
-    (e: React.MouseEvent): { cx: number; cy: number } => {
+    (e: React.PointerEvent): { cx: number; cy: number } => {
       const rect = canvasRef.current!.getBoundingClientRect();
       return {
         cx: ((e.clientX - rect.left) / rect.width) * CANVAS_SIZE,
         cy: ((e.clientY - rect.top) / rect.height) * CANVAS_SIZE,
       };
     },
-    []
+    [],
   );
 
   const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
       e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
       const { cx, cy } = getCanvasPos(e);
       const sorted = [...curves].sort((a, b) => a.x - b.x);
 
@@ -204,20 +210,21 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
       } else if (sorted.length < MAX_POINTS) {
         // Add new point
         const newPoint = fromCanvas(cx, cy);
+        if (sorted.some((point) => point.x === newPoint.x)) return;
         const newCurves = [...sorted, newPoint].sort((a, b) => a.x - b.x);
         setCurves(newCurves);
         // Find index of the new point to start dragging it
         const newIdx = newCurves.findIndex(
-          (p) => p.x === newPoint.x && p.y === newPoint.y
+          (p) => p.x === newPoint.x && p.y === newPoint.y,
         );
         setDraggingIdx(newIdx);
       }
     },
-    [curves, setCurves, findNearestPoint, fromCanvas, getCanvasPos]
+    [curves, setCurves, findNearestPoint, fromCanvas, getCanvasPos],
   );
 
   const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.PointerEvent<HTMLCanvasElement>) => {
       const { cx, cy } = getCanvasPos(e);
       const newPoint = fromCanvas(cx, cy);
       setHoverInfo(newPoint);
@@ -246,7 +253,7 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
 
       setCurves(updated);
     },
-    [draggingIdx, curves, setCurves, fromCanvas, getCanvasPos]
+    [draggingIdx, curves, setCurves, fromCanvas, getCanvasPos],
   );
 
   const handleMouseUp = useCallback(() => {
@@ -266,16 +273,115 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
     <div className="space-y-1.5">
       <canvas
         ref={canvasRef}
+        role="img"
+        aria-label="Tone curve and histogram. Edit exact points with the controls below."
         style={{ width: CANVAS_SIZE, height: CANVAS_SIZE }}
-        className="w-full cursor-crosshair rounded border border-border"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
+        className="w-full cursor-crosshair touch-none rounded border border-border"
+        onPointerDown={handleMouseDown}
+        onPointerMove={handleMouseMove}
+        onPointerUp={handleMouseUp}
+        onPointerCancel={handleMouseLeave}
         onContextMenu={handleContextMenu}
       />
+      <details className="text-xs text-muted-foreground">
+        <summary className="flex min-h-11 cursor-pointer items-center">
+          Edit exact curve points
+        </summary>
+        <div className="space-y-2">
+          {[...curves]
+            .sort((a, b) => a.x - b.x)
+            .map((point, index, sorted) => (
+              <div className="flex items-center gap-2" key={index}>
+                {(["x", "y"] as const).map((axis) => (
+                  <label
+                    key={axis}
+                    className="flex min-w-0 flex-1 flex-col gap-1"
+                  >
+                    {axis === "x" ? "Input" : "Output"} {index + 1}
+                    <input
+                      type="number"
+                      min={
+                        axis === "x" && index > 0 ? sorted[index - 1].x + 1 : 0
+                      }
+                      max={
+                        axis === "x" && index < sorted.length - 1
+                          ? sorted[index + 1].x - 1
+                          : 255
+                      }
+                      disabled={
+                        axis === "x" &&
+                        (index === 0 || index === sorted.length - 1)
+                      }
+                      value={point[axis]}
+                      className="h-11 w-full rounded border border-border bg-background px-2"
+                      onChange={(event) => {
+                        const min =
+                          axis === "x" && index > 0
+                            ? sorted[index - 1].x + 1
+                            : 0;
+                        const max =
+                          axis === "x" && index < sorted.length - 1
+                            ? sorted[index + 1].x - 1
+                            : 255;
+                        const value = Math.max(
+                          min,
+                          Math.min(max, Number(event.target.value) || 0),
+                        );
+                        setCurves(
+                          sorted.map((item, i) =>
+                            i === index ? { ...item, [axis]: value } : item,
+                          ),
+                        );
+                      }}
+                    />
+                  </label>
+                ))}
+                {index > 0 && index < sorted.length - 1 && (
+                  <button
+                    className="mt-5 flex h-11 w-11 shrink-0 items-center justify-center"
+                    aria-label={`Remove curve point ${index + 1}`}
+                    onClick={() =>
+                      setCurves(sorted.filter((_, i) => i !== index))
+                    }
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+            ))}
+          <button
+            className="flex min-h-11 items-center gap-2 disabled:opacity-40"
+            disabled={curves.length >= MAX_POINTS}
+            onClick={() => {
+              const sorted = [...curves].sort((a, b) => a.x - b.x);
+              const gaps = sorted
+                .slice(1)
+                .map((point, index) => ({
+                  index,
+                  width: point.x - sorted[index].x,
+                }))
+                .sort((a, b) => b.width - a.width);
+              const gap = gaps[0];
+              if (!gap || gap.width < 2) return;
+              const left = sorted[gap.index],
+                right = sorted[gap.index + 1];
+              setCurves(
+                [
+                  ...sorted,
+                  {
+                    x: Math.round((left.x + right.x) / 2),
+                    y: Math.round((left.y + right.y) / 2),
+                  },
+                ].sort((a, b) => a.x - b.x),
+              );
+            }}
+          >
+            <Plus size={16} /> Add curve point
+          </button>
+        </div>
+      </details>
       <p className="text-center font-mono text-[10px] text-muted-foreground">
-        Click to add point · Right-click to remove
+        Drag or tap to shape. Exact controls support keyboard editing.
       </p>
     </div>
   );
