@@ -1,17 +1,7 @@
 "use client";
 
-import { useCallback, useState, useEffect, useRef } from "react";
-import {
-  Upload,
-  ImageIcon,
-  Loader2,
-  ArrowUpRight,
-  ShieldCheck,
-  Crop,
-  SlidersHorizontal,
-  Layers,
-} from "lucide-react";
-import { createSampleImage, drawSample } from "@/lib/image-processing/sample";
+import { useCallback, useState } from "react";
+import { Upload, ImageIcon, Loader2 } from "lucide-react";
 import { useEditorStore } from "@/lib/store/editor-store";
 
 // MIME types for validation (macOS often reports HEIC as "" or "application/octet-stream")
@@ -55,10 +45,6 @@ function isAcceptedImage(file: File): boolean {
 }
 
 export function ImageUpload() {
-  const sampleRef = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    if (sampleRef.current) drawSample(sampleRef.current);
-  }, []);
   const setSourceImage = useEditorStore((s) => s.setSourceImage);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,124 +171,46 @@ export function ImageUpload() {
     input.click();
   }, [handleFile]);
 
-  const handleSample = async () => {
-    setError(null);
-    try {
-      setSourceImage(await createSampleImage(), "tonal-study.png");
-    } catch {
-      setError("The sample could not open. Choose an image instead.");
-    }
-  };
-
   return (
-    <div className="studio-welcome">
-      <div className="studio-welcome-grid">
-        <section
-          className="studio-welcome-copy"
-          aria-labelledby="welcome-heading"
-        >
-          <p className="studio-eyebrow">Your image. Ready for its next life.</p>
-          <h2 id="welcome-heading">
-            From photograph
-            <br />
-            to finished print.
-          </h2>
-          <p className="studio-intro">
-            Shape the crop and tone once. Take away a fine art print,
-            transparent artwork for apparel, and the original colour crop.
-          </p>
-          <button
-            type="button"
-            onClick={handleClick}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            disabled={converting}
-            className={`studio-dropzone ${isDragging ? "is-dragging" : ""}`}
-          >
-            {converting ? (
-              <Loader2
-                className="size-6 animate-spin motion-reduce:animate-none"
-                aria-hidden
-              />
-            ) : isDragging ? (
-              <ImageIcon className="size-6" aria-hidden />
-            ) : (
-              <Upload className="size-6" aria-hidden />
-            )}
-            <span className="font-medium">
-              {converting
-                ? "Converting your image"
-                : isDragging
-                  ? "Drop it here"
-                  : "Choose a photograph"}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              or drag it here. JPG, PNG, WebP and HEIC.
-            </span>
-          </button>
-          <button
-            type="button"
-            onClick={handleSample}
-            className="studio-sample-link"
-          >
-            Try the tonal study <ArrowUpRight size={16} aria-hidden />
-          </button>
-          {error && (
-            <p role="alert" className="mt-3 text-sm text-destructive">
-              {error}
-            </p>
+    <div className="flex h-full w-full items-center justify-center p-8">
+      <button
+        type="button"
+        onClick={handleClick}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        disabled={converting}
+        className={`flex min-h-80 w-full max-w-lg cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-colors ${
+          isDragging
+            ? "border-primary bg-primary/5"
+            : "border-border hover:border-muted-foreground"
+        }`}
+      >
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
+          {converting ? (
+            <Loader2 aria-hidden="true" className="h-6 w-6 text-primary animate-spin" />
+          ) : isDragging ? (
+            <ImageIcon aria-hidden="true" className="h-6 w-6 text-primary" />
+          ) : (
+            <Upload aria-hidden="true" className="h-6 w-6 text-muted-foreground" />
           )}
-          <p className="studio-privacy">
-            <ShieldCheck size={15} aria-hidden />
-            Images are processed on your device.
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-medium text-foreground">
+            {converting
+              ? "Converting HEIC..."
+              : isDragging
+                ? "Drop image here"
+                : "Drop an image or click to browse"}
           </p>
-        </section>
-        <figure className="studio-study">
-          <div className="studio-study-top">
-            <span>Tonal study / 01</span>
-            <span>Synthetic sample</span>
-          </div>
-          <canvas
-            ref={sampleRef}
-            width={1200}
-            height={900}
-            aria-label="A synthetic mountain study with a range of light and dark tones"
-            role="img"
-          />
-          <figcaption>
-            <span>A little room to experiment.</span>
-            <span>Open it in the real editor.</span>
-          </figcaption>
-        </figure>
-      </div>
-      <div className="studio-workflow" aria-label="Editing workflow">
-        {[
-          {
-            Icon: Crop,
-            title: "Frame it",
-            detail: "A crop that keeps your proportions.",
-          },
-          {
-            Icon: SlidersHorizontal,
-            title: "Shape the light",
-            detail: "Curves, contrast and a live histogram.",
-          },
-          {
-            Icon: Layers,
-            title: "Make it material",
-            detail: "Print and apparel outputs, at your chosen widths.",
-          },
-        ].map(({ Icon, title, detail }) => (
-          <div key={title}>
-            <Icon size={19} aria-hidden />
-            <div>
-              <h3>{title}</h3>
-              <p>{detail}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            JPG, PNG, WebP, or HEIC
+          </p>
+        </div>
+        {error && (
+          <p role="alert" className="text-xs text-destructive">{error}</p>
+        )}
+      </button>
     </div>
   );
 }
