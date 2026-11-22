@@ -1,3 +1,4 @@
+import { swapCropOrientation } from "../image-processing/crop";
 import { create } from "zustand";
 import type {
   CropRegion,
@@ -54,7 +55,11 @@ interface EditorStore {
   setPreviewMode: (mode: PreviewMode) => void;
   setTshirtBackground: (bg: string) => void;
   setExportSizes: (sizes: ExportSize[]) => void;
-  setProcessedImages: (print: ImageBitmap, tshirt: ImageBitmap, histogram: Uint32Array) => void;
+  setProcessedImages: (
+    print: ImageBitmap,
+    tshirt: ImageBitmap,
+    histogram: Uint32Array,
+  ) => void;
   setIsProcessing: (processing: boolean) => void;
   setIsExporting: (exporting: boolean) => void;
   setExportProgress: (progress: number) => void;
@@ -114,8 +119,7 @@ export const useEditorStore = create<EditorStore>((set) => ({
       panY: 0,
     }),
 
-  setCrop: (crop) =>
-    set((state) => ({ crop: { ...state.crop, ...crop } })),
+  setCrop: (crop) => set((state) => ({ crop: { ...state.crop, ...crop } })),
 
   setAspectRatio: (aspectRatio) =>
     set((state) => {
@@ -176,6 +180,11 @@ export const useEditorStore = create<EditorStore>((set) => ({
 
   rotateCrop90: () =>
     set((state) => ({
-      crop: { ...state.crop, rotation: (state.crop.rotation + 90) % 360 },
+      ...(state.sourceImage
+        ? {
+            crop: swapCropOrientation(state.crop, state.sourceImage),
+            aspectRatio: "free" as const,
+          }
+        : {}),
     })),
 }));

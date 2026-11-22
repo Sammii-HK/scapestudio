@@ -20,6 +20,7 @@ import {
   Image as ImageIcon,
   Shirt,
   Palette,
+  Check,
 } from "lucide-react";
 
 const TSHIRT_BACKGROUNDS = [
@@ -45,16 +46,16 @@ export function Toolbar() {
   const clearImage = useEditorStore((s) => s.clearImage);
 
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-card px-4">
+    <header className="flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-4 py-2">
       {/* Left: Logo */}
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <h1 className="font-mono text-sm font-semibold tracking-tight text-foreground">
           ScapeStudio
         </h1>
         {sourceFileName && (
           <>
             <span className="text-border">/</span>
-            <span className="max-w-48 truncate font-mono text-xs text-muted-foreground">
+            <span className="max-w-36 sm:max-w-48 truncate font-mono text-xs text-muted-foreground">
               {sourceFileName}
             </span>
           </>
@@ -63,7 +64,7 @@ export function Toolbar() {
 
       {/* Center: Preview mode toggle */}
       {sourceImage && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ToggleGroup
             type="single"
             value={previewMode}
@@ -71,15 +72,24 @@ export function Toolbar() {
               if (v) setPreviewMode(v as PreviewMode);
             }}
           >
-            <ToggleGroupItem value="split" className="h-7 gap-1 px-2 text-xs">
+            <ToggleGroupItem
+              value="split"
+              className="min-h-11 gap-1 px-3 text-xs"
+            >
               <Columns2 className="h-3 w-3" />
               Split
             </ToggleGroupItem>
-            <ToggleGroupItem value="print" className="h-7 gap-1 px-2 text-xs">
+            <ToggleGroupItem
+              value="print"
+              className="min-h-11 gap-1 px-3 text-xs"
+            >
               <ImageIcon className="h-3 w-3" />
               Print
             </ToggleGroupItem>
-            <ToggleGroupItem value="tshirt" className="h-7 gap-1 px-2 text-xs">
+            <ToggleGroupItem
+              value="tshirt"
+              className="min-h-11 gap-1 px-3 text-xs"
+            >
               <Shirt className="h-3 w-3" />
               T-Shirt
             </ToggleGroupItem>
@@ -89,7 +99,12 @@ export function Toolbar() {
           {(previewMode === "tshirt" || previewMode === "split") && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="min-h-11 min-w-11"
+                  aria-label="Apparel preview background"
+                >
                   <Palette className="h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
@@ -112,7 +127,11 @@ export function Toolbar() {
                     />
                     <span>{bg.label}</span>
                     {tshirtBackground === bg.value && (
-                      <span className="ml-auto text-primary">&#10003;</span>
+                      <Check
+                        size={15}
+                        className="ml-auto text-primary"
+                        aria-hidden
+                      />
                     )}
                   </DropdownMenuItem>
                 ))}
@@ -128,8 +147,9 @@ export function Toolbar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="min-h-11 min-w-11"
             onClick={() => setZoom(zoom / 1.2)}
+            aria-label="Zoom out"
           >
             <ZoomOut className="h-4 w-4" />
           </Button>
@@ -139,16 +159,18 @@ export function Toolbar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="min-h-11 min-w-11"
             onClick={() => setZoom(zoom * 1.2)}
+            aria-label="Zoom in"
           >
             <ZoomIn className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="min-h-11 min-w-11"
             onClick={resetViewport}
+            aria-label="Fit image"
           >
             <Maximize className="h-4 w-4" />
           </Button>
@@ -156,8 +178,9 @@ export function Toolbar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="min-h-11 min-w-11"
             onClick={() => setShowGrid(!showGrid)}
+            aria-label="Toggle crop grid"
           >
             <Grid3X3
               className={`h-4 w-4 ${showGrid ? "text-primary" : "text-muted-foreground"}`}
@@ -169,8 +192,9 @@ export function Toolbar() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+            className="min-h-11 min-w-11 text-muted-foreground hover:text-destructive"
             onClick={clearImage}
+            aria-label="Close image"
           >
             <X className="h-4 w-4" />
           </Button>

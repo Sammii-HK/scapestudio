@@ -4,8 +4,14 @@ import { useCallback, useRef, useState } from "react";
 import { useEditorStore } from "@/lib/store/editor-store";
 
 type HandlePosition =
-  | "tl" | "tr" | "bl" | "br"
-  | "t" | "b" | "l" | "r"
+  | "tl"
+  | "tr"
+  | "bl"
+  | "br"
+  | "t"
+  | "b"
+  | "l"
+  | "r"
   | "move";
 
 interface ImageRect {
@@ -57,7 +63,7 @@ export function CropOverlay({ imageRect }: CropOverlayProps) {
   }, [aspectRatio, sourceImage]);
 
   const handleMouseDown = useCallback(
-    (e: React.MouseEvent, handle: HandlePosition) => {
+    (e: React.PointerEvent, handle: HandlePosition) => {
       e.stopPropagation();
       e.preventDefault();
       setActiveHandle(handle);
@@ -70,12 +76,15 @@ export function CropOverlay({ imageRect }: CropOverlayProps) {
         cropH: crop.height,
       };
 
-      const handleMouseMove = (ev: MouseEvent) => {
+      const handleMouseMove = (ev: PointerEvent) => {
         const dx = (ev.clientX - dragStartRef.current.mouseX) / imageRect.width;
-        const dy = (ev.clientY - dragStartRef.current.mouseY) / imageRect.height;
+        const dy =
+          (ev.clientY - dragStartRef.current.mouseY) / imageRect.height;
         const s = dragStartRef.current;
         const ratio = getAspectRatioValue();
-        const imgAspect = sourceImage ? sourceImage.width / sourceImage.height : 1;
+        const imgAspect = sourceImage
+          ? sourceImage.width / sourceImage.height
+          : 1;
 
         let newX = s.cropX;
         let newY = s.cropY;
@@ -121,14 +130,16 @@ export function CropOverlay({ imageRect }: CropOverlayProps) {
 
       const handleMouseUp = () => {
         setActiveHandle(null);
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
+        window.removeEventListener("pointermove", handleMouseMove);
+        window.removeEventListener("pointerup", handleMouseUp);
+        window.removeEventListener("pointercancel", handleMouseUp);
       };
 
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
+      window.addEventListener("pointermove", handleMouseMove);
+      window.addEventListener("pointerup", handleMouseUp);
+      window.addEventListener("pointercancel", handleMouseUp);
     },
-    [crop, imageRect, setCrop, getAspectRatioValue, sourceImage]
+    [crop, imageRect, setCrop, getAspectRatioValue, sourceImage],
   );
 
   const handleCursors: Record<HandlePosition, string> = {
@@ -147,11 +158,23 @@ export function CropOverlay({ imageRect }: CropOverlayProps) {
     { pos: "tl", x: cropPixels.x, y: cropPixels.y },
     { pos: "tr", x: cropPixels.x + cropPixels.width, y: cropPixels.y },
     { pos: "bl", x: cropPixels.x, y: cropPixels.y + cropPixels.height },
-    { pos: "br", x: cropPixels.x + cropPixels.width, y: cropPixels.y + cropPixels.height },
+    {
+      pos: "br",
+      x: cropPixels.x + cropPixels.width,
+      y: cropPixels.y + cropPixels.height,
+    },
     { pos: "t", x: cropPixels.x + cropPixels.width / 2, y: cropPixels.y },
-    { pos: "b", x: cropPixels.x + cropPixels.width / 2, y: cropPixels.y + cropPixels.height },
+    {
+      pos: "b",
+      x: cropPixels.x + cropPixels.width / 2,
+      y: cropPixels.y + cropPixels.height,
+    },
     { pos: "l", x: cropPixels.x, y: cropPixels.y + cropPixels.height / 2 },
-    { pos: "r", x: cropPixels.x + cropPixels.width, y: cropPixels.y + cropPixels.height / 2 },
+    {
+      pos: "r",
+      x: cropPixels.x + cropPixels.width,
+      y: cropPixels.y + cropPixels.height / 2,
+    },
   ];
 
   return (
@@ -180,7 +203,7 @@ export function CropOverlay({ imageRect }: CropOverlayProps) {
 
       {/* Crop border */}
       <div
-        className={`pointer-events-auto absolute border border-white/80 ${
+        className={`pointer-events-auto touch-none absolute border border-white/80 ${
           activeHandle === "move" ? "cursor-grabbing" : "cursor-move"
         }`}
         style={{
@@ -189,17 +212,49 @@ export function CropOverlay({ imageRect }: CropOverlayProps) {
           width: cropPixels.width,
           height: cropPixels.height,
         }}
-        onMouseDown={(e) => handleMouseDown(e, "move")}
+        onPointerDown={(e) => handleMouseDown(e, "move")}
       >
         {/* Rule of thirds grid */}
         {showGrid && (
           <svg className="pointer-events-none absolute inset-0 h-full w-full">
             {/* Vertical lines */}
-            <line x1="33.33%" y1="0" x2="33.33%" y2="100%" stroke="white" strokeOpacity="0.3" strokeWidth="0.5" />
-            <line x1="66.67%" y1="0" x2="66.67%" y2="100%" stroke="white" strokeOpacity="0.3" strokeWidth="0.5" />
+            <line
+              x1="33.33%"
+              y1="0"
+              x2="33.33%"
+              y2="100%"
+              stroke="white"
+              strokeOpacity="0.3"
+              strokeWidth="0.5"
+            />
+            <line
+              x1="66.67%"
+              y1="0"
+              x2="66.67%"
+              y2="100%"
+              stroke="white"
+              strokeOpacity="0.3"
+              strokeWidth="0.5"
+            />
             {/* Horizontal lines */}
-            <line x1="0" y1="33.33%" x2="100%" y2="33.33%" stroke="white" strokeOpacity="0.3" strokeWidth="0.5" />
-            <line x1="0" y1="66.67%" x2="100%" y2="66.67%" stroke="white" strokeOpacity="0.3" strokeWidth="0.5" />
+            <line
+              x1="0"
+              y1="33.33%"
+              x2="100%"
+              y2="33.33%"
+              stroke="white"
+              strokeOpacity="0.3"
+              strokeWidth="0.5"
+            />
+            <line
+              x1="0"
+              y1="66.67%"
+              x2="100%"
+              y2="66.67%"
+              stroke="white"
+              strokeOpacity="0.3"
+              strokeWidth="0.5"
+            />
           </svg>
         )}
       </div>
@@ -208,16 +263,24 @@ export function CropOverlay({ imageRect }: CropOverlayProps) {
       {handles.map(({ pos, x, y }) => (
         <div
           key={pos}
-          className={`pointer-events-auto absolute ${handleCursors[pos]}`}
+          className={`pointer-events-auto touch-none absolute ${handleCursors[pos]}`}
           style={{
-            left: x - HANDLE_SIZE / 2,
-            top: y - HANDLE_SIZE / 2,
-            width: HANDLE_SIZE,
-            height: HANDLE_SIZE,
+            left: x - 20,
+            top: y - 20,
+            width: 40,
+            height: 40,
           }}
-          onMouseDown={(e) => handleMouseDown(e, pos)}
+          onPointerDown={(e) => handleMouseDown(e, pos)}
         >
-          <div className="h-full w-full rounded-sm border border-white/90 bg-white/20 shadow-sm" />
+          <div
+            style={{
+              width: HANDLE_SIZE,
+              height: HANDLE_SIZE,
+              left: 20 - HANDLE_SIZE / 2,
+              top: 20 - HANDLE_SIZE / 2,
+            }}
+            className="absolute rounded-sm border border-white/90 bg-white/20 shadow-sm"
+          />
         </div>
       ))}
     </div>

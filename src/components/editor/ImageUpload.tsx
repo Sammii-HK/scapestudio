@@ -23,7 +23,12 @@ async function hasHeicSignature(file: File): Promise<boolean> {
     const buffer = await file.slice(0, 12).arrayBuffer();
     const bytes = new Uint8Array(buffer);
     // HEIC files have an "ftyp" box at offset 4
-    if (bytes[4] !== 0x66 || bytes[5] !== 0x74 || bytes[6] !== 0x79 || bytes[7] !== 0x70) {
+    if (
+      bytes[4] !== 0x66 ||
+      bytes[5] !== 0x74 ||
+      bytes[6] !== 0x79 ||
+      bytes[7] !== 0x70
+    ) {
       return false;
     }
     const brand = String.fromCharCode(bytes[8], bytes[9], bytes[10], bytes[11]);
@@ -50,7 +55,9 @@ export function ImageUpload() {
       setError(null);
 
       if (!isAcceptedImage(file)) {
-        setError(`Unsupported file type (${file.type || "unknown"}). Use JPG, PNG, WebP, or HEIC.`);
+        setError(
+          `Unsupported file type (${file.type || "unknown"}). Use JPG, PNG, WebP, or HEIC.`,
+        );
         return;
       }
 
@@ -68,10 +75,16 @@ export function ImageUpload() {
           setConverting(true);
           try {
             const heic2any = (await import("heic2any")).default;
-            const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.95 });
+            const converted = await heic2any({
+              blob: file,
+              toType: "image/jpeg",
+              quality: 0.95,
+            });
             imageSource = Array.isArray(converted) ? converted[0] : converted;
           } catch {
-            setError("Failed to convert HEIC. Try exporting as JPEG from Photos.");
+            setError(
+              "Failed to convert HEIC. Try exporting as JPEG from Photos.",
+            );
             setConverting(false);
             return;
           }
@@ -84,7 +97,7 @@ export function ImageUpload() {
         setError("Failed to load image. Try exporting as JPEG from Photos.");
       }
     },
-    [setSourceImage]
+    [setSourceImage],
   );
 
   const handleDrop = useCallback(
@@ -130,9 +143,11 @@ export function ImageUpload() {
         }
       }
 
-      setError("Could not read the image. Try exporting from Photos as JPEG first, or click to browse.");
+      setError(
+        "Could not read the image. Try exporting from Photos as JPEG first, or click to browse.",
+      );
     },
-    [handleFile]
+    [handleFile],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -164,7 +179,8 @@ export function ImageUpload() {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`flex h-80 w-full max-w-lg cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-colors ${
+        disabled={converting}
+        className={`flex min-h-80 w-full max-w-lg cursor-pointer flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-colors ${
           isDragging
             ? "border-primary bg-primary/5"
             : "border-border hover:border-muted-foreground"
@@ -172,11 +188,11 @@ export function ImageUpload() {
       >
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
           {converting ? (
-            <Loader2 className="h-6 w-6 text-primary animate-spin" />
+            <Loader2 aria-hidden="true" className="h-6 w-6 text-primary animate-spin" />
           ) : isDragging ? (
-            <ImageIcon className="h-6 w-6 text-primary" />
+            <ImageIcon aria-hidden="true" className="h-6 w-6 text-primary" />
           ) : (
-            <Upload className="h-6 w-6 text-muted-foreground" />
+            <Upload aria-hidden="true" className="h-6 w-6 text-muted-foreground" />
           )}
         </div>
         <div className="text-center">
@@ -192,7 +208,7 @@ export function ImageUpload() {
           </p>
         </div>
         {error && (
-          <p className="text-xs text-destructive">{error}</p>
+          <p role="alert" className="text-xs text-destructive">{error}</p>
         )}
       </button>
     </div>
