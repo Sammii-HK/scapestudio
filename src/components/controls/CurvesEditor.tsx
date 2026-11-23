@@ -22,6 +22,9 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [draggingIdx, setDraggingIdx] = useState<number | null>(null);
+  // Bumped when the system colour scheme flips so the canvas redraws with
+  // the new --curve-* tokens.
+  const [schemeTick, setSchemeTick] = useState(0);
   const [hoverInfo, setHoverInfo] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -48,6 +51,7 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
 
   // Draw the curves editor
   const draw = useCallback(() => {
+    void schemeTick; // redraw when the colour scheme flips
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -61,8 +65,14 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
 
     ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
+    // Colours come from the --curve-* tokens in globals.css (per scheme)
+    const css = getComputedStyle(canvas);
+    const token = (name: string, fallback: string) =>
+      css.getPropertyValue(name).trim() || fallback;
+    const bg = token("--curve-bg", "#0a0a0a");
+
     // Background
-    ctx.fillStyle = "#0a0a0a";
+    ctx.fillStyle = bg;
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
     // Histogram
@@ -72,7 +82,7 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
         if (histogram[i] > maxCount) maxCount = histogram[i];
       }
       if (maxCount > 0) {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        ctx.fillStyle = token("--curve-histogram", "rgba(255, 255, 255, 0.08)");
         for (let i = 0; i < 256; i++) {
           const barH = (histogram[i] / maxCount) * INNER;
           const x = PADDING + (i / 255) * INNER;
@@ -82,7 +92,7 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
     }
 
     // Grid lines
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
+    ctx.strokeStyle = token("--curve-grid", "rgba(255, 255, 255, 0.06)");
     ctx.lineWidth = 0.5;
     for (let i = 1; i < 4; i++) {
       const pos = PADDING + (i / 4) * INNER;
@@ -97,7 +107,7 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
     }
 
     // Diagonal reference line
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
+    ctx.strokeStyle = token("--curve-diagonal", "rgba(255, 255, 255, 0.12)");
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(PADDING, PADDING + INNER);
@@ -106,7 +116,7 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
 
     // Draw curve from LUT
     const lut = generateCurveLUT(curves);
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+    ctx.strokeStyle = token("--curve-line", "rgba(255, 255, 255, 0.7)");
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     for (let x = 0; x < 256; x++) {
@@ -125,20 +135,22 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
       // Outer ring
       ctx.beginPath();
       ctx.arc(cx, cy, POINT_RADIUS + 1, 0, Math.PI * 2);
-      ctx.fillStyle = "#0a0a0a";
+      ctx.fillStyle = bg;
       ctx.fill();
 
       // Point
       ctx.beginPath();
       ctx.arc(cx, cy, POINT_RADIUS, 0, Math.PI * 2);
       ctx.fillStyle =
-        i === draggingIdx ? "hsl(35, 90%, 60%)" : "rgba(255, 255, 255, 0.9)";
+        i === draggingIdx
+          ? token("--curve-point-active", "hsl(35, 90%, 60%)")
+          : token("--curve-point", "rgba(255, 255, 255, 0.9)");
       ctx.fill();
     });
 
     // Hover info
     if (hoverInfo) {
-      ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+      ctx.fillStyle = token("--curve-label", "rgba(255, 255, 255, 0.7)");
       ctx.font = "10px var(--font-geist-mono), monospace";
       ctx.textAlign = "right";
       ctx.fillText(
@@ -147,11 +159,18 @@ export function CurvesEditor({ histogram }: CurvesEditorProps) {
         CANVAS_SIZE - 2,
       );
     }
-  }, [curves, histogram, draggingIdx, hoverInfo, toCanvas]);
+  }, [curves, histogram, draggingIdx, hoverInfo, toCanvas, schemeTick]);
 
   useEffect(() => {
     draw();
   }, [draw]);
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-color-scheme: light)");
+    const onChange = () => setSchemeTick((t) => t + 1);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   // Find the nearest control point to a canvas position
   const findNearestPoint = useCallback(
